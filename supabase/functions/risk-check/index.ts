@@ -172,7 +172,7 @@ serve(async (req) => {
       resolvedHolder = cachedHolder?.holder_name ?? ''
     }
 
-    const rpcParams: any = {
+    const rpcParams: Record<string, unknown> = {
       p_account_number: account_number,
       p_bank_name: bank_name ?? '',
       p_amount: amount || 0,

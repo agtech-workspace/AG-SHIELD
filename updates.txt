@@ -166,3 +166,16 @@ Q5. Ship Phase 1 as one deploy or incrementally?
   aws-1-eu-west-1). No Supabase, lint/build/test blockers. Local
   cron/runner.py remains the scheduler (no GitHub Actions). Entries
   000–006 unchanged. This is Entry 007.
+================================================================
+ENTRY 008 - PHASES 1-2 EXECUTED: GIT SYNC, MIGRATIONS, TIERING, ALERTS
+Date: Thursday, 1 October 2026
+================================================================
+
+- Git root fixed to C:/Users/avama/Downloads/AG SHIELD/safeguard-web; repo https://github.com/agtech-workspace/AG-SHIELD synced (frontend + cron + supabase + configs).
+- Phase 1A (migrations 01-05): canonical bank codes, registry_aliases, normalized_name, hardened screen_person_name with agency severity ordering (fixes PEP masking SANCTIONS), shared normalization.
+- Phase 1B: edge normalization (resolve-account/risk-check), cron normalization (lookup_cache_refresher, opensanctions_sync). All pushed.
+- Phase 2: data_tier (OFFICIAL/OSINT), blacklist_source += CROWDSOURCED, evaluate_entity_risk_matrix(search_term, p_include_osint BOOLEAN DEFAULT FALSE) with index-backed trigram (no OR dmetaphone), batch blacklist_alert_queue (decoupled, scoped to user_checks -> notifications, never global auth.users), runner_heartbeat + heartbeat in cron/runner.py, B2B OSINT stripping at both SQL and Edge (defense in depth).
+- Confidence per goals.txt (0.20/0.50/0.85-0.95, cap <= 0.40), unresolved-holder guard.
+- Verification: npm run lint has 10 pre-existing style issues (unused in resolve-account stub, one any in risk-check). npm run build clean. npx vitest run --no-file-parallelism --pool=forks: 53/53 passed.
+- Todo updated; Feature 3 (Admin + B2B keys, reuse tenants/api_keys/reports) next.
+
