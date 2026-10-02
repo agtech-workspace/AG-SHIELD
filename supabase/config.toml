@@ -1,0 +1,64 @@
+# Supabase local/CLI configuration for the new project instance.
+# Reference: https://supabase.com/docs/guides/cli/config
+# After creating the new project, run: supabase login && supabase link --project-ref <new-ref>
+
+project_id = "safeguard-web"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8083
+
+[analytics]
+enabled = true
+port = 54327
+vector_port = 54328
+
+[functions."risk-check"]
+verify_jwt = false
+
+[functions."resolve-account"]
+verify_jwt = false
+
+[functions."verify-cac"]
+verify_jwt = false
+
+# Auth for local dev. Redirect URLs must match VITE_SUPABASE_SITE_URL / VITE_AUTH_REDIRECT_URL.
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/dashboard"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# Guest mode for the anonymous risk-check demo
+[auth.email.template.update_user]
+subject = "AG Shield password change"
+content_path = "./supabase/templates/update_user.txt"

@@ -1,0 +1,168 @@
+
+================================================================
+ENTRY 007 — GOALS.TXT FULL REVIEW: BACKDOORS + 6 VULNERABILITIES + 1 NEW BUG
+Date: Thursday, 1 October 2026
+================================================================
+
+The full goals.txt (507 lines) was reread. The newly appended opening
+section adds two items ("Active Production Backdoors" and "Fragile
+Background Execution") before the six vulnerabilities. The complete
+triage below reflects all material.
+
+1) ACTIVE PRODUCTION BACKDOORS (goals.txt lines 1-3)
+- POC account identified: shield.poc.125047@gmail.com remains in the
+  production auth table and shows last_sign_in_at = 2026-10-01 10:43:05.539679+00
+  (email confirmed). A second POC account exists:
+  shield.poc.125000@gmail.com (unconfirmed, never signed in).
+- Live verification (public.profiles <-> auth.users joined by id):
+  - 407cd322-a8d0-49f6-ab13-0c4f3f8af174 | shield.poc.125047@gmail.com | is_admin=false | confirmed=true | last_sign_in=2026-10-01T10:43:05.539679Z
+  - 122e2880-790c-4d2d-a019-4ef2c41cd3c7 | shield.poc.125000@gmail.com | is_admin=false | confirmed=false | last_sign_in=NULL
+- Privileges: coalesce(is_admin,false)=false for both; no admin profiles
+  exist. user_sessions rows for POCs: 0. user_checks total: 0.
+- Risk: the POC profile is active (confirmed + recent sign-in) but
+  currently has no elevated role. Introducing Feature 3 (scoped roles
+  root/moderator/support) while leaving an unmonitored POC account live
+  remains an unnecessary privilege-escalation vector and should be
+  removed or disabled before expanding RBAC.
+
+2) FRAGILE BACKGROUND EXECUTION (lines 1-3)
+- lookup_cache_refresher.py uses asyncio.sleep(0.4) to pace ~50 upstream
+  requests per 6-hour interval and runs only under cron/runner.py (local
+  Python process). If the host sleeps/reboots/terminal closes, the worker
+  stops silently and the cache will stagnate without alerts. This is an
+  operational resilience gap (local-only scheduler). Recommendation:
+  keep local runner for now (per project decision), but add a local
+  heartbeat/dead-man (write last_run to a small table or append to a
+  log with an alert threshold) and do NOT move to GitHub Actions yet.
+
+3) THE SIX CRITICAL VULNERABILITIES (lines 9-111)
+
+#1 Bank Code Discrepancies & Cache Key Pollution (VALID)
+- bank_lookup_cache key is (account_number, COALESCE(bank_code,'')) and
+  uq_bank_lookup_cache_key enforces that exact pair. Bank codes vary
+  (044/000014, 090110/50515). Example consequence: query 044 cached,
+  000014 treated as miss -> duplicate upstream calls + duplicate rows.
+- Fix: centralized Bank Code Normalization (canonical code ← NIP 3-digit
+  or 6-digit, provider codes, bank name aliases) in Postgres before
+  insert/query. Normalize on write and read; use canonical id/code.
+
+#2 Inflated "Confidence Score" Fallacy (VALID)
+- Zero-history checks can return Verdict: safe, Score: 25/100,
+  Confidence: 0.75 (75%). High confidence requires abundant proof; zero
+  history must be low confidence.
+- Fix: baseline confidence <= 0.35 for zero-history; scale upward only
+  with clean history, multi-source corroboration and accumulated
+  evidence. Treat unresolved holder identity as a strong confidence
+  penalty (never allow "safe" with high confidence on unverified
+  identity).
+
+#3 Title Noise & Multi-Token Name Evasion (VALID — WORSE)
+- Paystack names include honorifics (ALHAJI, DR., CHIEF, MRS., MR).
+  Token reordering/permutations and extra noise tokens can drop trigram
+  scores below 0.85 or push matches into the wrong band. This is
+  compounded by severity masking (see #7).
+- Fix: name sanitization pipeline: strip common Nigerian titles (Alhaji/
+  Hajia, Chief, Dr/Ph.D, Pastor/Prophet, Imam, Engr, Barr, Mr/Mrs/Ms),
+  collapse whitespace, strip punctuation, normalize case, and also
+  consider token-order-insensitive comparison (e.g. sort tokens). Keep
+  index-backed (GIN trgm) matching.
+
+#4 Upstream Quota Drain via Input Manipulation (VALID)
+- Variants ("8165764169","08165764169"," 8165764169 ") create cache miss
+  (exact string equality on account_number). resolve-account/index.ts
+  uses the raw account_number (lines ~106,115) with no normalization or
+  NUBAN validation. Can exhaust Paystack quota quickly.
+- Fix: TRIM, strip non-digits, normalize leading zeros to standard
+  10-digit NUBAN where applicable, reject invalid formats at the Edge
+  Function boundary before DB/upstream calls. Normalize in SQL too
+  (shared invariant).
+
+#5 Unindexed Rolling Velocity Query Bottleneck (FACTUALLY WRONG)
+- goals.txt states velocity reads global_risk_evaluations for counts in
+  last 48h on an account. Live schema: global_risk_evaluations has NO
+  account_number column (columns: id, channel, tenant_id, queried_name,
+  bank_name, evaluated_score, verdict_level, reasons, recommended_action,
+  source_registry, execution_time_ms, created_at). Existing indexes:
+  idx_eval_created, idx_eval_queried, idx_eval_tenant_channel.
+- The velocity signal in the engine reads reports (and/or user_checks)
+  as appropriate. reports already indexed (account_id, created_at DESC),
+  idx_reports_account_created on (account_id, created_at DESC). No
+  current unindexed bottleneck exists for this specific claim. No
+  action required for this claim as written.
+
+#6 Broken Tier 1 Moat: Missing Realtime Alert Engine (VALID)
+- No database trigger to cross-reference user_checks when an account is
+  later added to registry_blacklist and notify affected users. The
+  "Realtime Alert Safeguard" is not implemented.
+- Fix: reuse existing notifications table (not auth.users scan). Scope
+  alerts to affected user_checks (e.g. rows that checked that account
+  within a retention window) and populate via trigger or idempotent job.
+  Do NOT SELECT FROM auth.users to broadcast to all users.
+
+4) SEVERITY MASKING BUG DISCOVERED (NOT IN GOALS LIST)
+Reproduced live via screen_person_name:
+- 'MR UMAR ABDULLAHI' → 5 rows returned; PEP 'Abdullahi Umar' 83 is
+  first, SANCTIONS 'UMAR ABDULLAHI' 83 is third → engine exits on first
+  row -> REVIEW instead of BLOCK.
+- 'ALHAJI UMAR ABDULLAHI' and 'ALHAJI DR UMAR ABDULLAHI' same masking.
+- 'CHIEF DR CHIKWUKA EZE' collapses 100 → 50 (drops into watch band).
+A real sanctioned NIGSAC holder can be downgraded when bank names carry
+titles. Root cause: 7c loop exits after the first candidate (ordered by
+raw score). Fix: rank by agency severity (SANCTIONS > INTERPOL > PEP >
+other) then score DESC, and evaluate the worst-agency match (or return
+all and pick highest-severity). Keep matching index-backed.
+
+Live note: resolved Paystack names show irregular whitespace ('UMAR   ABDULLAHI')
+but no honorifics observed yet; the title case is plausible.
+
+5) EXECUTION ORDER (AGREED)
+Phase 1 (correctness/abuse, no API contract change)
+  1. Fix 7c severity masking (agency-severity ordering).
+  2. Name sanitization: strip titles, collapse whitespace, strip
+     punctuation, normalize case; add normalized_name + GIN trgm.
+  3. Goals #1+#4: bank_codes reference table + normalize_bank_code() and
+     normalize_account_number() in SQL (shared by resolve-account,
+     risk-check, Python refresher); reject non-10-digit NUBANs.
+  4. registry_aliases table (76,428 aliases) + GIN trgm (keep array fallback).
+
+Phase 2 (legal/credibility)
+  5. Data tiering OFFICIAL|OSINT; strip OSINT from B2B responses;
+     relabel UI; add CROWDSOURCED to blacklist_source.
+  6. Goals #2+#3 as one coherent confidence model; never return 'safe'
+     for an unresolved holder identity.
+
+Phase 3 (moat)
+  7. Realtime alerts scoped via user_checks → notifications (trigger/job).
+  8. Approved crowd reports → OSINT registry rows (reuse reports/approval).
+  9. Local heartbeat/dead-man in runner.py (operational resilience).
+
+6) REJECTED BLUEPRINT SECTIONS (do not implement)
+- goals.txt §1 DROP TABLE ... CASCADE / enum recreation (would destroy
+  current registry_blacklist/SANCTIONS/PEP data and break engine).
+- evaluate_entity_risk_matrix as written (non-indexable OR, is_blacklisted
+  on weak matches, no tier separation).
+- risk-engine-hub + Redis (unnecessary cost, raw api_key_hash comparison,
+  non-durable billing, wrong import); Redis-based requirements rejected.
+- efcc_scraper.py fake endpoint (https://internal-scrapers.gov.ng) — reject.
+- b2b_tenants/consumer_channel duplication (reuse tenants, api_keys,
+  lookup_api_key, existing consumer_channel enum).
+- Duplicating reports/approvals/notifications; reuse existing tables/functions.
+
+7) OPEN QUESTIONS (to approve before implementation)
+Q1. Git repo: provide private repo URL (empty or near-empty). gh CLI not
+    installed; pushes via plain git + Windows Credential Manager. Should
+    we git init safeguard-web (current git toplevel is C:/Users/avama,
+    entire home folder) and commit today's work? Keep goals.txt and
+    secrets out (already in .gitignore).
+Q2. Tiering enforcement: SQL only, or SQL + supabase/functions/risk-check
+    filtering (both recommended)?
+Q3. Confidence model baseline: zero-history <= 0.30; holder resolved but
+    no history ~0.55; account row with clean history ~0.90? Approve?
+Q4. Archive rejected blueprint into updates.txt marked DO NOT RUN?
+Q5. Ship Phase 1 as one deploy or incrementally?
+
+8) STATUS
+- All verifications complete against live DB (zmiaaxnevvznmvfzlcba,
+  aws-1-eu-west-1). No Supabase, lint/build/test blockers. Local
+  cron/runner.py remains the scheduler (no GitHub Actions). Entries
+  000–006 unchanged. This is Entry 007.

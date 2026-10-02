@@ -1,0 +1,4 @@
+<h2>Confirm Change of Email</h2>
+
+<p>Follow this link to reset the password for your user:</p>
+<p><a href="{{ .ConfirmationURL }}">Change Password</a></p>
