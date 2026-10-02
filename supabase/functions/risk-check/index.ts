@@ -172,14 +172,18 @@ serve(async (req) => {
       resolvedHolder = cachedHolder?.holder_name ?? ''
     }
 
-    const { data, error } = await supabase.rpc('assess_transfer_risk', {
+    const rpcParams: any = {
       p_account_number: account_number,
       p_bank_name: bank_name ?? '',
       p_amount: amount || 0,
       p_is_new_recipient: is_new_recipient ?? true,
       p_include_sandbox: includeSandbox,
       p_holder_name: resolvedHolder,
-    })
+    }
+    if (channel === 'API_B2B') {
+      rpcParams.p_include_osint = false
+    }
+    const { data, error } = await supabase.rpc('assess_transfer_risk', rpcParams)
     if (error) throw error
 
     const execution_time_ms = Date.now() - start

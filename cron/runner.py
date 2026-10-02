@@ -1,51 +1,85 @@
 import asyncio
-import os
-from datetime import datetime
+import logging
+from typing import Any, Dict, List
 
 from env import load_env_local
-from report_settler import run_report_settler
-from efcc_scraper import scrape_efcc_press_releases
-from opensanctions_sync import main as run_opensanctions_sync
-from lookup_cache_refresher import main as run_lookup_cache_refresher
-from db_exporter import export_sqlite_snapshot
+from lookup_cache_refresher import refresh_cache
+from opensanctions_sync import run_registry_ingestion_cycle
 
-# paystack_verifier retired: lookup_cache_refresher supersedes it (cache +
-# backfill of both mono_verified_name and account_name).
-SCHEDULES = {
-    'report_settler':   2 * 60 * 60,
-    'lookup_cache_refresher': 6 * 60 * 60,
-    'efcc_scraper':     24 * 60 * 60,
-    'opensanctions_sync': 24 * 60 * 60,
-}
+logger = logging.getLogger("cron.runner")
+logging.basicConfig(level=logging.INFO)
 
-last_run = {k: 0.0 for k in SCHEDULES}
+# Heartbeat helpers (optional, if DATABASE_URL set)
+try:
+    import os
+    import psycopg2
+    from psycopg2.extras import Json
 
-async def main_loop():
-    load_env_local()
-    print("[Runner] Cron runner started")
+    def heartbeat(service: str, status: str = "ok", details: Dict[str, Any] | None = None) -> None:
+        url = os.environ.get("DATABASE_URL")
+        if not url:
+            return
+        conn = None
+        try:
+            conn = psycopg2.connect(url)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO public.runner_heartbeat (service, last_run_at, status, details)
+                VALUES (%s, NOW(), %s, %s)
+                ON CONFLICT (service) DO UPDATE SET
+                  last_run_at = NOW(),
+                  status = EXCLUDED.status,
+                  details = EXCLUDED.details,
+                  updated_at = NOW();
+                """,
+                (service, status, Json(details or {})),
+            )
+            conn.commit()
+            cur.close()
+        except Exception as e:
+            logger.debug("heartbeat failed: %s", e)
+        finally:
+            if conn:
+                conn.close()
+except Exception:
+    def heartbeat(service: str, status: str = "ok", details: Dict[str, Any] | None = None) -> None:
+        return
 
+TASKS: List[Dict[str, Any]] = [
+    {
+        "name": "lookup_cache_refresher",
+        "interval_hours": 6,
+        "func": lambda: refresh_cache(),
+    },
+    {
+        "name": "opensanctions_sync",
+        "interval_hours": 24,
+        "func": lambda: run_registry_ingestion_cycle(),
+    },
+]
+
+async def run_scheduler() -> None:
+    last_runs: Dict[str, float] = {}
     while True:
-        now = datetime.now().timestamp()
-
-        for job_name, interval in SCHEDULES.items():
-            if now - last_run[job_name] >= interval:
-                print(f"[Runner] Starting {job_name}...")
+        now = asyncio.get_event_loop().time()
+        for task in TASKS:
+            name = task["name"]
+            iv = task["interval_hours"] * 3600
+            lr = last_runs.get(name, 0)
+            if now - lr >= iv:
+                logger.info("running task %s", name)
                 try:
-                    if job_name == 'report_settler':
-                        await run_report_settler()
-                    elif job_name == 'lookup_cache_refresher':
-                        await run_lookup_cache_refresher()
-                    elif job_name == 'efcc_scraper':
-                        await scrape_efcc_press_releases()
-                    elif job_name == 'opensanctions_sync':
-                        await run_opensanctions_sync()
-                    last_run[job_name] = now
-                    print(f"[Runner] {job_name} complete")
+                    res = task["func"]()
+                    if asyncio.iscoroutine(res):
+                        await res
+                    heartbeat(name, "ok", {"interval_hours": task["interval_hours"]})
                 except Exception as e:
-                    print(f"[Runner] {job_name} failed: {e}")
-
+                    logger.exception("task %s failed: %s", name, e)
+                    heartbeat(name, "error", {"error": str(e)})
+                last_runs[name] = now
         await asyncio.sleep(60)
-        await export_sqlite_snapshot()
 
-if __name__ == '__main__':
-    asyncio.run(main_loop())
+if __name__ == "__main__":
+    load_env_local()
+    asyncio.run(run_scheduler())
