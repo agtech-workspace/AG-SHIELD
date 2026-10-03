@@ -216,3 +216,50 @@ Date: Thursday, 1 October 2026
 - Lint/build/tests: 0 errors, build clean, 53/53 passed.
 - Pushed to https://github.com/agtech-workspace/AG-SHIELD.
 
+
+================================================================
+ENTRY 012 - FEATURE 3 EXECUTION PLAN, DASHBOARD JSX ISSUE, SECURITY GATES
+Date: Friday, 3 October 2026
+================================================================
+
+**DashboardPage.tsx Structural Issue**
+- Current state: src/pages/DashboardPage.tsx contains pre-existing JSX structural corruption (mismatched fragments/divs around line ~1487 and near end ~2217+). HEAD also contains corrupted structure.
+- Required fix per new_method.txt: read entire file, identify structural errors, overwrite ENTIRE file cleanly (no surgical replacements). Use native file-write tool.
+- Verify: npx tsc --noEmit, npx vite build, npx vitest run (expect 53/53).
+
+**Security Gates (Feature 3 prerequisites)**
+- POC accounts: shield.poc.125047@gmail.com, shield.poc.125000@gmail.com must be verified in DB - profiles.role must have NO elevated access (not root_admin/moderator); lock to user tier before enabling elevated RBAC. Block POC from elevated actions in code.
+- Hash-only B2B keys: full key shown once at issuance, store ONLY hashed version in api_keys. Verify via hash using lookup_api_key (active, not revoked/expired).
+
+**Feature 3 Work Plan**
+1. Fix DashboardPage.tsx via full-file overwrite; verify build/tests pass.
+2. POC lockdown verification + documentation.
+3. RBAC enforcement on admin/mod endpoints (profiles.role in {root_admin,moderator,support,user}).
+4. B2B key management (issue/revoke/rotate, scopes verify:read default, expires_at/revoked_at/name).
+5. Postgres-only rate limits/billing (per-key/tenant counters, batch aggregates tied to tenants.id). No Redis.
+6. Moderation: reports/approve_report/reject_report -> approved creates OSINT+CROWDSOURCED. Show data_tier + source_agency in B2C Risk Factors.
+7. Alerts + heartbeat: process_blacklist_alert_queue() periodically in cron/runner.py; maintain update_runner_heartbeat.
+8. POC cleanup before enabling elevated RBAC. Archive rejected blueprint as [ARCHIVED - DO NOT IMPLEMENT] (Redis, b2b_tenants/b2c_user_interventions/crowdsourced_submissions_queue duplicates, global auth.users broadcast).
+
+**Clarifying Questions (for tradeoffs)**
+1. PDF export: Keep jspdf+html2canvas (current MVP) or switch to CSS print stylesheet (@media print)+window.print() per goals.txt cleaner approach?
+2. B2B key issuance UI: Integrate into Admin Dashboard as implied? Any specific UX/fields required?
+3. POC lockdown enforcement: App-level only, or also DB-level (RLS/constraints/triggers) to prevent POC from ever getting root_admin/moderator roles?
+4. Proceed with Feature 3 execution now (in execution mode after approval)?
+
+================================================================
+ENTRY 013 - WORKSPACE START PATH AND CURRENT LOCATION
+Date: Friday, 3 October 2026
+================================================================
+
+Starting location (explicit):
+C:\Users\avama\Downloads\AG SHIELD\safeguard-web
+
+Repository URL (confirmed):
+https://github.com/agtech-workspace/AG-SHIELD
+
+Workspace root folder (from environment):
+C:\Users\avama
+
+Git repo working directory (current):
+C:\Users\avama\Downloads\AG SHIELD\safeguard-web

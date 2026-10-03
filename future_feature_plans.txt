@@ -1,0 +1,44 @@
+﻿FUTURE FEATURE PLANS (ALL FEATURES DISCUSSED)
+================================================================
+Date: Friday, 3 October 2026
+Repository: https://github.com/agtech-workspace/AG-SHIELD
+Working Directory: C:\Users\avama\Downloads\AG SHIELD\safeguard-web
+
+--- NEW METHODOLOGY (MANDATORY GOING FORWARD) ---
+From new_method.txt:
+- STOP surgical line edits, sed, Python line-based string surgery - breaks JSX.
+- Read ENTIRE file when asked (not head/tail). Open thoroughly.
+- Overwrite ENTIRE file cleanly using native file-writing tool (no partial replacement).
+- Apply this approach for ALL files and going forward, not just Feature 3.
+- Run npx vite build to verify after structural changes.
+
+--- FEATURE 3 (CURRENT/ACTIVE) ---
+Status: Active (RBAC enforcement in progress)
+1. RBAC enforcement in risk-check/admin endpoints (active). Enforce profiles.role in {root_admin, moderator, support, user}.
+2. B2B key management (hash-only). Reuse api_keys/lookup_api_key. Show full key once at issuance. Support scopes (default verify:read), expires_at, revoked_at, name. Issue/revoke/rotate.
+3. Postgres-only rate limits/billing (no Redis). Per-key/tenant counters, batch aggregates tied to tenants.id. Enforce on B2B calls.
+4. Reports moderation via reports/approve_report/reject_report. Approved creates OSINT + CROWDSOURCED entries.
+5. B2C tier labeling (data_tier + source_agency) in UI.
+6. POC cleanup (shield.poc.125047@gmail.com, shield.poc.125000@gmail.com) before enabling elevated RBAC. Verify no admin flags; lock to user.
+7. Scanner page: export search history as PDF (note: evaluate jspdf+html2canvas vs CSS print + window.print()).
+8. Call process_blacklist_alert_queue() periodically in cron/runner.py; maintain update_runner_heartbeat.
+9. Archive rejected blueprint in updates.txt as [ARCHIVED - DO NOT IMPLEMENT] (Redis, b2b_tenants/b2c_user_interventions/crowdsourced_submissions_queue duplicates, global auth.users broadcast).
+10. Full verification (lint/build/tests 53/53) and append explicit Entry with details. Commit/push to https://github.com/agtech-workspace/AG-SHIELD.
+
+--- DEVIATIONS FROM GOALS.TXT (ARCHIVED RATIONALE) ---
+- Scoped batch alerts: blacklist_alert_queue + process_blacklist_alert_queue scoped to user_checks last 30 days; reject global broadcast to auth.users on bulk ingest (prevents spam/bloat/locks).
+- No Redis: Postgres-only for rate limits/billing/usage counters tied to tenants.id.
+- Reuse schema: tenants/api_keys/lookup_api_key/reports/approve_report/reject_report/notifications/profiles. Do not duplicate tables.
+- Tiering enforced at SQL and Edge. B2B uses p_include_osint=false; Edge strips OSINT/CROWDSOURCED for B2B.
+- Severity: SANCTIONS>INTERPOL>PEP>OTHER, then score DESC.
+
+--- FUTURE CONSIDERATIONS (BEYOND FEATURE 3) ---
+- Complete DashboardPage.tsx full-file rewrite to fix structural corruption (follow new_method.txt exactly). Ensure build/tests pass (53/53).
+- Evaluate PDF export approach: keep jspdf+html2canvas (MVP) vs CSS print stylesheet (@media print)+window.print() for cleaner output.
+- Consider DB-level constraints (RLS/triggers) for POC lockdown in addition to app-level checks.
+- Continue cron/runner.py with local scheduler + heartbeat; do not move to GitHub Actions yet (per current direction).
+- Ensure no secrets committed; .env.* and goals.txt/user interface.txt remain gitignored.
+- POC cleanup before enabling elevated RBAC (document verification).
+- Follow hash-only API key storage and existing lookup_api_key semantics consistently.
+
+End of plans.
