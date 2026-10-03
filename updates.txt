@@ -205,3 +205,14 @@ Date: Thursday, 1 October 2026
   scoped to user_checks in last 30 days (user_id + account_number match),
   writing only to notifications (never global broadcast). Decoupled from insert path.
 - This satisfies scoped realtime alerts and the bulk-ingest safety warning.
+
+================================================================
+ENTRY 011 - FEATURE 3 + SEARCH HISTORY PDF EXPORT
+Date: Thursday, 1 October 2026
+================================================================
+
+- Feature 3 groundwork committed: RBAC roles (root_admin/moderator/support), API key scopes (verify:read default).
+- Scanner page: added Export PDF for search history (jspdf + html2canvas). Exports recent activity section to PDF when history exists.
+- Lint/build/tests: 0 errors, build clean, 53/53 passed.
+- Pushed to https://github.com/agtech-workspace/AG-SHIELD.
+
