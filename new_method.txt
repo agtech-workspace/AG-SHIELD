@@ -1,0 +1,13 @@
+
+STOP YOUR CURRENT APPROACH.
+Do not use Python scripts, sed, or PowerShell commands to edit lines surgically. Your string replacements are breaking the JSX bracket and tag matching at the bottom of the file.
+
+NEW INSTRUCTIONS:
+
+Read the entire src/pages/DashboardPage.tsx file to understand the component structure.
+
+Identify the JSX syntax error around line 1487 (likely a mismatched </div>, }, or </>).
+
+Overwrite the ENTIRE FILE cleanly using your native file-writing tool. Do not do a partial replacement, when asked to read a file, open it entirely and read it thoroughly, not with head or tail commands.
+
+Run npx vite build one final time to confirm it compiles.
