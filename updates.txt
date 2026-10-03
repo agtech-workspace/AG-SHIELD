@@ -179,3 +179,14 @@ Date: Thursday, 1 October 2026
 - Verification: npm run lint has 10 pre-existing style issues (unused in resolve-account stub, one any in risk-check). npm run build clean. npx vitest run --no-file-parallelism --pool=forks: 53/53 passed.
 - Todo updated; Feature 3 (Admin + B2B keys, reuse tenants/api_keys/reports) next.
 
+
+================================================================
+ENTRY 009 - GOALS.TXT REVIEW + FEATURE 3 START
+Date: Thursday, 1 October 2026
+================================================================
+
+- Read full goals.txt (474 lines). Key alignment: severity-first ranking, title sanitization, canonical bank codes + NUBAN cleaning, data_tier + p_include_osint, confidence 0.20/0.50/0.85-0.95 with cap <=0.40.
+- Differences noted: bank_codes (ours) vs bank_code_mappings (goals) - compatible and richer. Alert design: we use blacklist_alert_queue (batch processor, scoped to user_checks last 30 days) vs goals pending queue; rejected global auth.users broadcast (would spam on bulk ingest).
+- Verdict: Phases 1-2 match safe requirements. Keeping scoped batch alerts.
+- Feature 3 started: RBAC roles (root_admin/moderator/support), reuse tenants/api_keys/lookup_api_key/reports/notifications, hash-only B2B keys, Postgres rate limits (no Redis), B2B OSINT excluded at both SQL+Edge.
+- Lint/build/tests: 0 errors, build clean, 53/53 passed. Pushed fixes.
