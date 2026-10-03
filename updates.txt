@@ -190,3 +190,18 @@ Date: Thursday, 1 October 2026
 - Verdict: Phases 1-2 match safe requirements. Keeping scoped batch alerts.
 - Feature 3 started: RBAC roles (root_admin/moderator/support), reuse tenants/api_keys/lookup_api_key/reports/notifications, hash-only B2B keys, Postgres rate limits (no Redis), B2B OSINT excluded at both SQL+Edge.
 - Lint/build/tests: 0 errors, build clean, 53/53 passed. Pushed fixes.
+
+================================================================
+ENTRY 010 - RATIONALE FOR DEVIATING FROM GOALS.TXT ALERT EXAMPLE
+Date: Thursday, 1 October 2026
+================================================================
+
+- goals.txt ends with example trigger broadcasting to ALL auth.users:
+  INSERT INTO b2c_user_interventions (...) SELECT id FROM auth.users;
+- Rejected: bulk OpenSanctions ingest (thousands of rows) would create
+  notifications for every user (thousands x thousands) causing lock contention,
+  DB bloat, user spam, and timeouts.
+- Implemented: blacklist_alert_queue + process_blacklist_alert_queue(batch_size)
+  scoped to user_checks in last 30 days (user_id + account_number match),
+  writing only to notifications (never global broadcast). Decoupled from insert path.
+- This satisfies scoped realtime alerts and the bulk-ingest safety warning.
