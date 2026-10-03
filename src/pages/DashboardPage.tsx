@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase'
 import { clearDemoSession, isDemoMode } from '../lib/demoAuth'
 import { processRisk, type RiskInput } from '../lib/riskEngine'
 import { getMockAccount } from '../lib/mockData'
-import { ACCOUNT_NUMBER_LENGTH, HISTORY_MAX_ITEMS, HIGH_AMOUNT_THRESHOLD, BANKS, BANK_CODES, REPORT_CATEGORIES } from '../lib/constants'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import { AlertTriangle, ArrowRight, Award, CheckCircle, Search, Loader2, User, AlertCircle as AlertIcon, Bell, X } from 'lucide-react'
 import Gauge from '../components/Gauge'
 import { TOUR_STEPS, TOUR_LOCALE } from '../components/tourSteps'
@@ -347,9 +348,18 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [subscribeName, setSubscribeName] = useState('')
   const [subscribeFeedback, setSubscribeFeedback] = useState('')
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, HISTORY_MAX_ITEMS)))
-  }, [history])
+  const exportHistoryPDF = async () => {
+    const element = document.getElementById('recent-activity')
+    if (!element || history.length === 0) return
+    const canvas = await html2canvas(element, { scale: 2 })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const imgProps = pdf.getImageProperties(imgData)
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+    pdf.save('search-history.pdf')
+  }
 
   useEffect(() => {
     async function loadProfileAndDashboard() {
@@ -1169,11 +1179,20 @@ export default function DashboardPage({ session }: { session: Session }) {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
+            <div id="recent-activity" className="bg-white p-6 rounded-2xl shadow border border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Recent Activity</h3>
-                {history.length > 0 && <span className="text-xs text-gray-400">{history.length} total checks</span>}
-              </div>
+                <div className="flex items-center gap-2">
+                  {history.length > 0 && (
+                    <button
+                      onClick={exportHistoryPDF}
+                      className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Export PDF
+                    </button>
+                  )}
+                  {history.length > 0 && <span className="text-xs text-gray-400">{history.length} total checks</span>}
+                </div>
               {history.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-3xl mb-2 opacity-30">🔍</div>
