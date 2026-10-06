@@ -9,6 +9,8 @@ import { getMockAccount } from '../lib/mockData'
 import { ACCOUNT_NUMBER_LENGTH, BANK_CODES, BANKS, HIGH_AMOUNT_THRESHOLD, HISTORY_MAX_ITEMS, REPORT_CATEGORIES } from '../lib/constants'
 import { AlertTriangle, ArrowRight, Award, CheckCircle, Search, Loader2, User, AlertCircle as AlertIcon, Bell, X } from 'lucide-react'
 import Gauge from '../components/Gauge'
+import AdminStatsOverview from '../components/admin/AdminStatsOverview'
+import UserManagement from '../components/admin/UserManagement'
 import B2BTenantsKeys from '../components/admin/B2BTenantsKeys'
 import RunnerHeartbeat from '../components/admin/RunnerHeartbeat'
 import { TOUR_STEPS, TOUR_LOCALE } from '../components/tourSteps'
@@ -50,6 +52,7 @@ type HistoryItem = {
 type Profile = {
   nickname: string
   is_admin?: boolean
+  role?: string
 }
 
 type ReportFeedItem = {
@@ -266,6 +269,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     return checkAccount && checkAccount.replace(/\D/g, '').length === ACCOUNT_NUMBER_LENGTH ? 'scan' : 'home'
   })
   const [profile, setProfile] = useState<Profile | null>(null)
+  const isAdminViewer = profile?.role === 'root_admin' || profile?.role === 'moderator'
   const [nicknameInput, setNicknameInput] = useState('')
   const [savingNickname, setSavingNickname] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -361,7 +365,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         return
       }
       try {
-        const { data: profileData } = await supabase.from('profiles').select('nickname, is_admin').eq('id', session.user.id).maybeSingle()
+        const { data: profileData } = await supabase.from('profiles').select('nickname, is_admin, role').eq('id', session.user.id).maybeSingle()
         if (profileData) {
           setProfile(profileData as Profile)
         } else {
@@ -705,7 +709,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   useEffect(() => {
-    if (profile?.is_admin && supabase) {
+    if (isAdminViewer && supabase) {
       supabase
         .from('reports')
         .select('id, reason_category, description, evidence_url, created_at, account:accounts(account_number, bank_name, overall_risk_level)')
@@ -716,7 +720,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           if (data) setPendingReports(data as unknown as ReportFeedItem[])
         })
     }
-  }, [profile?.is_admin])
+  }, [isAdminViewer])
 
   async function signOut() {
     if (isDemoMode()) {
@@ -1092,7 +1096,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           >
             Settings
           </button>
-          {profile?.is_admin && (
+          {isAdminViewer && (
             <button
               type="button"
               className={`${activeTab === 'admin' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
@@ -2174,8 +2178,10 @@ export default function DashboardPage({ session }: { session: Session }) {
           </div>
         )}
 
-        {activeTab === 'admin' && profile?.is_admin && (
+        {activeTab === 'admin' && isAdminViewer && (
           <div className="space-y-6">
+          <AdminStatsOverview />
+          <UserManagement currentRole={profile?.role} />
           <div className="bg-white p-6 rounded-2xl shadow max-w-3xl">
             <h2 className="text-lg font-semibold mb-4">Pending Reports Review</h2>
             {pendingReports.length === 0 ? (

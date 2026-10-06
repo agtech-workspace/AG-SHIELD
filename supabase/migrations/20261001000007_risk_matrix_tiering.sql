@@ -38,9 +38,9 @@ BEGIN
       LEAST(1.0, b.s)::REAL AS confidence_score_raw,
       LEAST(100, ROUND(b.s * 100)::INT) AS match_score,
       CASE
-        WHEN upper(b.source_agency) IN ('SANCTIONS') THEN 4
-        WHEN upper(b.source_agency) IN ('INTERPOL') THEN 3
-        WHEN upper(b.source_agency) IN ('PEP') THEN 2
+        WHEN upper(b.source_agency::text) IN ('SANCTIONS') THEN 4
+        WHEN upper(b.source_agency::text) IN ('INTERPOL') THEN 3
+        WHEN upper(b.source_agency::text) IN ('PEP') THEN 2
         ELSE 1
       END AS sev
     FROM base

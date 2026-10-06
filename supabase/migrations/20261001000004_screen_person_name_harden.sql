@@ -1,60 +1,122 @@
--- Harden screen_person_name: agency severity ordering, index-backed trigram, normalized_name support
-CREATE OR REPLACE FUNCTION public.screen_person_name(p_name TEXT)
-RETURNS TABLE(
-  source_agency TEXT,
-  entity_name TEXT,
-  match_score INT
+-- Harden screen_person_name: input guard only.
+-- Rewritten (2026-10-06) to preserve the LIVE function contract from
+-- 20260929000007_stage2_corpus_hardening.sql: 6-column return type and
+-- SQL-language semantics. The prior draft changed the return type to
+-- 3 columns, which PostgreSQL rejects ("cannot change return type of
+-- existing function") and would also break the LIVE caller
+-- assess_transfer_risk (reads .reason_flagged). Agency severity ordering
+-- (SANCTIONS/PEP branches) was removed as dead weight — live callers
+-- already order by match_score. Exact/alias matches score 100; shared-
+-- token trigram hits score least(99, floor(sim*100)); up to 5 results.
+CREATE OR REPLACE FUNCTION public.screen_person_name(p_name text)
+RETURNS table (
+  entity_name text,
+  source_agency text,
+  reason_flagged text,
+  match_score int,
+  confidence numeric,
+  entity_identifier text
 )
-LANGUAGE plpgsql
-STABLE
-AS $$
-DECLARE
-  q TEXT;
-  -- Severity weights
-BEGIN
-  q := public.normalize_person_name(p_name);
-  IF q IS NULL OR length(q) = 0 THEN
-    RETURN;
-  END IF;
-
-  -- Return best match by agency severity DESC, similarity DESC
-  RETURN QUERY
-  WITH candidates AS (
-    SELECT
-      rb.source_agency,
-      rb.entity_name,
-      COALESCE(similarity(rb.normalized_name, q), similarity(rb.entity_name, q), 0) AS s
-    FROM public.registry_blacklist rb
-    WHERE rb.normalized_name IS NOT NULL AND rb.normalized_name % q
-       OR rb.entity_name IS NOT NULL AND rb.entity_name % q
+language sql
+stable
+set search_path = public
+as $$
+  with base as (
+    select upper(btrim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'))) as norm
   ),
-  scored AS (
-    SELECT
-      c.source_agency,
+  q as (
+    select
+      b.norm,
+      regexp_split_to_array(b.norm, ' ') as toks,
+      -- surname-first variant: greedy group 1 = all but the last token
+      case
+        when array_length(regexp_split_to_array(b.norm, ' '), 1) >= 2
+          then regexp_replace(b.norm, '^(.+) (\S+)$', '\2 \1')
+        else b.norm
+      end as rev
+    from base b
+    where length(b.norm) >= 1
+  ),
+  cand as (
+    -- branch 1: index-backed trigram candidates, both name orders
+    select b.*
+    from public.registry_blacklist b, q
+    where b.type = 'INDIVIDUAL'
+      and (b.entity_name % q.norm or b.entity_name % q.rev)
+    union
+    -- branch 2: index-backed alias candidates
+    select b.*
+    from public.registry_blacklist b, q
+    where b.type = 'INDIVIDUAL'
+      and exists (
+        select 1
+        from unnest(coalesce(b.aliases, '{}')) al
+        where al % q.norm or al % q.rev
+      )
+  ),
+  scored as (
+    select
       c.entity_name,
-      LEAST(100, ROUND(c.s * 100)::INT) AS match_score,
-      CASE
-        WHEN upper(c.source_agency) IN ('SANCTIONS') THEN 4
-        WHEN upper(c.source_agency) IN ('INTERPOL') THEN 3
-        WHEN upper(c.source_agency) IN ('PEP') THEN 2
-        ELSE 1
-      END AS sev
-    FROM candidates
-    WHERE COALESCE(similarity(
-             COALESCE(rb_entity_norm_or_name(c.entity_name, c.source_agency), c.entity_name),
-             q
-           ), 0) >= 0.40 -- keep as guard; index-backed
+      c.source_agency,
+      c.reason_flagged,
+      c.entity_identifier,
+      c.aliases,
+      q.norm,
+      q.rev,
+      (c.entity_name = q.norm or c.entity_name = q.rev) as name_exact,
+      exists (
+        select 1
+        from unnest(coalesce(c.aliases, '{}')) a
+        where upper(btrim(a)) = q.norm or upper(btrim(a)) = q.rev
+      ) as alias_exact,
+      greatest(
+        similarity(c.entity_name, q.norm),
+        similarity(c.entity_name, q.rev)
+      ) as sim,
+      (
+        -- token overlap: query tokens (len >= 3) present in the
+        -- candidate name or any alias
+        select count(*)
+        from unnest(q.toks) t
+        where length(t) >= 3
+          and (
+            t = any (regexp_split_to_array(upper(c.entity_name), ' '))
+            or exists (
+              select 1
+              from unnest(coalesce(c.aliases, '{}')) a
+              where t = any (regexp_split_to_array(upper(a), ' '))
+            )
+          )
+      ) as shared_tokens
+    from cand c, q
   )
-  SELECT
-    s.source_agency::TEXT,
-    s.entity_name::TEXT,
-    s.match_score
-  FROM scored s
-  ORDER BY s.sev DESC, s.match_score DESC
-  LIMIT 1;
-END;
+  select
+    s.entity_name,
+    s.source_agency::text,
+    s.reason_flagged,
+    (
+      case
+        when s.name_exact or s.alias_exact then 100
+        when s.shared_tokens >= 2 then least(99, floor(s.sim * 100)::int)
+        else 0
+      end
+    )::int as match_score,
+    (
+      case
+        when s.name_exact or s.alias_exact then 0.99
+        when s.shared_tokens >= 2 then round(least(0.95, (0.5 + s.sim * 0.45)::numeric), 2)
+        else 0
+      end
+    )::numeric as confidence,
+    s.entity_identifier
+  from scored s
+  where s.name_exact
+     or s.alias_exact
+     or s.shared_tokens >= 2
+  order by
+    case when s.name_exact or s.alias_exact then 100
+         when s.shared_tokens >= 2 then least(99, floor(s.sim * 100)::int)
+         else 0 end desc,
+    s.entity_name
+  limit 5;
 $$;
-
--- Helper to avoid referencing rb in subquery awkwardly (optional)
-CREATE OR REPLACE FUNCTION rb_entity_norm_or_name(_entity_name TEXT, _src TEXT)
-RETURNS TEXT AS $$ SELECT _entity_name; $$ LANGUAGE sql IMMUTABLE;

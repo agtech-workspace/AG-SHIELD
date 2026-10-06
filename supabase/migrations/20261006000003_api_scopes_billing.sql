@@ -7,7 +7,10 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ---------------------------------------------------------------------------
 -- 1) Scope + lifetime enforcement in the gateway lookup
 --    (revoked_at / expires_at added by 20261001000011 but never enforced)
--- ---------------------------------------------------------------------------
+-- NOTE: the pre-existing 20260918000001 lookup_api_key returns 5 columns;
+-- PostgreSQL refuses to change a function's return type, so DROP first.
+----------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.lookup_api_key(text);
 CREATE OR REPLACE FUNCTION public.lookup_api_key(p_key_hash text)
 RETURNS TABLE (
   tenant_id uuid,
@@ -74,7 +77,9 @@ BEGIN
            ELSE k.quota_period_start
          END
    WHERE k.key_hash = p_key_hash
-   RETURNING k.calls_this_month, COALESCE(t.monthly_quota, 0), k.per_call_rate_naira
+   RETURNING k.calls_this_month,
+             COALESCE((SELECT t.monthly_quota FROM public.tenants t WHERE t.id = k.tenant_id), 0),
+             k.per_call_rate_naira
         INTO v_calls, v_quota, v_rate;
 
   IF NOT FOUND THEN
@@ -142,7 +147,7 @@ CREATE OR REPLACE FUNCTION public.admin_issue_api_key(
 RETURNS TABLE (key_id uuid, raw_key text, key_prefix text, scopes text[], expires_at timestamptz)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_role text := public.current_profile_role();

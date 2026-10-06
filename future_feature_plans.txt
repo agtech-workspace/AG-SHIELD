@@ -1,44 +1,222 @@
-﻿FUTURE FEATURE PLANS (ALL FEATURES DISCUSSED)
-================================================================
-Date: Friday, 3 October 2026
-Repository: https://github.com/agtech-workspace/AG-SHIELD
-Working Directory: C:\Users\avama\Downloads\AG SHIELD\safeguard-web
+﻿MASTER EXECUTION PLAN — AG SHIELD (safeguard-web)
+Written 2026-10-06. This file is the single source of truth for what comes next.
+Source material for Phases C and D (WhatsApp plan text, B2B guide draft,
+Shield Scanner spec, TechVerse copy, clean-forward rules) was moved to
+future_feature_plans_source_material_archive.txt and will be relocated to its
+final homes during Phase C. Nothing was deleted.
 
---- NEW METHODOLOGY (MANDATORY GOING FORWARD) ---
-From new_method.txt:
-- STOP surgical line edits, sed, Python line-based string surgery - breaks JSX.
-- Read ENTIRE file when asked (not head/tail). Open thoroughly.
-- Overwrite ENTIRE file cleanly using native file-writing tool (no partial replacement).
-- Apply this approach for ALL files and going forward, not just Feature 3.
-- Run npx vite build to verify after structural changes.
+=====================================================================
+EXECUTION PROTOCOL (user-mandated — supersedes anything older)
+=====================================================================
+1. I make fixes/edits (files only — NO database push, NO git push unless
+   the plan below explicitly lists it).
+2. I STOP and wait for the user's command.
+3. On command: test the push in PLAN MODE (read-only only — dry-run +
+   catalog validation; no migration ever touches the DB without consent).
+4. Report errors -> fix -> re-test -> repeat until every file is
+   FUNCTIONALLY and STRUCTURALLY aligned (green table, zero errors).
+5. Real `supabase db push` happens ONLY on the user's explicit "push" command.
+6. After push: verification, edge deploy, frontend, commits — per phases below.
 
---- FEATURE 3 (CURRENT/ACTIVE) ---
-Status: Active (RBAC enforcement in progress)
-1. RBAC enforcement in risk-check/admin endpoints (active). Enforce profiles.role in {root_admin, moderator, support, user}.
-2. B2B key management (hash-only). Reuse api_keys/lookup_api_key. Show full key once at issuance. Support scopes (default verify:read), expires_at, revoked_at, name. Issue/revoke/rotate.
-3. Postgres-only rate limits/billing (no Redis). Per-key/tenant counters, batch aggregates tied to tenants.id. Enforce on B2B calls.
-4. Reports moderation via reports/approve_report/reject_report. Approved creates OSINT + CROWDSOURCED entries.
-5. B2C tier labeling (data_tier + source_agency) in UI.
-6. POC cleanup (shield.poc.125047@gmail.com, shield.poc.125000@gmail.com) before enabling elevated RBAC. Verify no admin flags; lock to user.
-7. Scanner page: export search history as PDF (note: evaluate jspdf+html2canvas vs CSS print + window.print()).
-8. Call process_blacklist_alert_queue() periodically in cron/runner.py; maintain update_runner_heartbeat.
-9. Archive rejected blueprint in updates.txt as [ARCHIVED - DO NOT IMPLEMENT] (Redis, b2b_tenants/b2c_user_interventions/crowdsourced_submissions_queue duplicates, global auth.users broadcast).
-10. Full verification (lint/build/tests 53/53) and append explicit Entry with details. Commit/push to https://github.com/agtech-workspace/AG-SHIELD.
+Phases run in order: C -> 0 -> T -> F -> P -> B. D is backlog (not now).
 
---- DEVIATIONS FROM GOALS.TXT (ARCHIVED RATIONALE) ---
-- Scoped batch alerts: blacklist_alert_queue + process_blacklist_alert_queue scoped to user_checks last 30 days; reject global broadcast to auth.users on bulk ingest (prevents spam/bloat/locks).
-- No Redis: Postgres-only for rate limits/billing/usage counters tied to tenants.id.
-- Reuse schema: tenants/api_keys/lookup_api_key/reports/approve_report/reject_report/notifications/profiles. Do not duplicate tables.
-- Tiering enforced at SQL and Edge. B2B uses p_include_osint=false; Edge strips OSINT/CROWDSOURCED for B2B.
-- Severity: SANCTIONS>INTERPOL>PEP>OTHER, then score DESC.
+=====================================================================
+PHASE C — DOCS & FOLDERS (files only; docs git commit+push approved in C3)
+=====================================================================
+C1. Create sibling folder  C:\Users\avama\Downloads\AG SHIELD\whatsapp-bot-plan\
+    - whatsapp-integration-plan.md = verbatim WhatsApp plan from the archive
+      + implementation notes:
+      * Use assess_transfer_risk (NOT evaluate_entity_risk_matrix — that is
+        name screening) for account/transfer checks.
+      * Env vars: WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN,
+        WHATSAPP_PHONE_NUMBER_ID (name them exactly this in .env.local).
+      * NUBAN parsing regex for inbound messages; example flows stay verbatim.
+      * Meta platform policy: opt-in, 24h window, monthly quota limits.
+    - Folder holds ONLY the WhatsApp plan (Option B decision).
 
---- FUTURE CONSIDERATIONS (BEYOND FEATURE 3) ---
-- Complete DashboardPage.tsx full-file rewrite to fix structural corruption (follow new_method.txt exactly). Ensure build/tests pass (53/53).
-- Evaluate PDF export approach: keep jspdf+html2canvas (MVP) vs CSS print stylesheet (@media print)+window.print() for cleaner output.
-- Consider DB-level constraints (RLS/triggers) for POC lockdown in addition to app-level checks.
-- Continue cron/runner.py with local scheduler + heartbeat; do not move to GitHub Actions yet (per current direction).
-- Ensure no secrets committed; .env.* and goals.txt/user interface.txt remain gitignored.
-- POC cleanup before enabling elevated RBAC (document verification).
-- Follow hash-only API key storage and existing lookup_api_key semantics consistently.
+C2. safeguard-web/docs/b2b-api-guide.md — production-accurate, secret-free:
+    - Auth: header `X-API-Key` (live risk-check reads X-API-Key).
+    - Endpoint: POST https://zmiaaxnevvznmvfzlcba.functions.supabase.co/risk-check
+    - Request: {account_number, bank_name, amount?, is_new_recipient?,
+      holder_name?}
+    - Response: risk_level (safe|warning|high_risk), risk_score,
+      confidence_interval, recommended_action (ALLOW|REVIEW|BLOCK),
+      source_registry, reasons[], social_proof, execution_time_ms.
+    - Errors: 400 malformed / 401 missing key / 403 valid key missing
+      `risk-check` scope / 429 (30 req/min/IP + burst + monthly quota) /
+      500 / 503 (upstream/DB timeout).
+    - Scopes, tiers (Official/Community, 100 free evaluation calls),
+      rate limits, monthly quotas, key rotation, no secrets in doc.
+    - Body must be rewritten to match live function (existing draft in
+      archive has wrong shapes — do not paste it verbatim).
 
-End of plans.
+C3. Move Shield Scanner spec + TechVerse copy from archive ->
+    safeguard-web/docs/shield-scanner-spec.md (D source material).
+
+C4. git commit + push docs (approved).
+
+=====================================================================
+PHASE 0 — MIGRATION FIXES (edit files only; STOP and wait after this)
+=====================================================================
+Context: remote has 16 unapplied migrations; push aborts on first failed
+file (each file = one transaction; retry resumes at failed file). Verified
+live catalog: pgcrypto in `extensions` schema; array_distinct missing;
+screen_person_name live = 6-col; lookup_api_key live = 5-col;
+approve_report/reject_report live = void(uuid) safe to replace; all helper
+fns (current_profile_role, is_admin_user, bump_api_key_usage, admin_*)
+do not exist yet; profiles.role absent; registry_aliases/alert_queue/
+runner_heartbeat/bank_codes tables absent; blacklist_source = 5 values
+(no CROWDSOURCED); PG >= 12 required for ALTER TYPE ADD VALUE in tx.
+
+0.1  supabase/migrations/20261001000001_bank_codes_canonical.sql
+     - FATAL: calls array_distinct() which does not exist (parse-time error
+       in function body => file 1 of 16 fails => nothing applies).
+     - Fix: replace every `array_distinct(a || b)` upsert expression with
+       `ARRAY(SELECT DISTINCT unnest(coalesce(a,'{}') || coalesce(b,'{}')))`
+       (normalize_bank_code body). Keep everything else.
+
+0.2  supabase/migrations/20261001000004_screen_person_name_harden.sql
+     - FATAL: CREATE OR REPLACE changes live 6-col return type to 3 cols
+       ("cannot change return type of existing function"). Old-version body
+       would also break live assess_transfer_risk (reads .reason_flagged).
+     - Fix: rewrite preserving EXACT live contract:
+       RETURNS table(entity_name text, source_agency text, reason_flagged
+       text, match_score int, confidence numeric, entity_identifier text)
+       with `set search_path = public`. Take semantics from the LIVE version
+       in 20260929000007_stage2_corpus_hardening.sql (keep 6 columns; drop
+       any dead SANCTIONS/PEP severity branches the harden draft added; add
+       only safe hardening: input null/length guard, LIMIT, type casts).
+       The pipeline must still output all 6 columns.
+
+0.3  supabase/migrations/20261006000003_api_scopes_billing.sql
+     - FATAL: CREATE OR REPLACE lookup_api_key 5->7 return cols (remote is
+       5-col TABLE). Fix: `DROP FUNCTION public.lookup_api_key(text);`
+       immediately before the CREATE (fresh 7-col).
+     - LATENT: admin_issue_api_key pins `SET search_path = public` but uses
+       gen_random_bytes/digest from `extensions` => runtime failure.
+       Fix: `SET search_path = public, extensions` in admin_issue_api_key
+       (and admin_rotate_api_key for consistency).
+
+0.4  CREATE supabase/migrations/20261006000004_rls_role_policies.sql
+     - Policies using is_admin_user() (created in 0006000002, earlier file):
+       * profiles: admin SELECT (replace/keep legacy "Admins read all
+         profiles" — gate on is_admin OR role IN root_admin/moderator),
+         NO admin UPDATE policy (RLS cannot reference NEW/OLD; option-b
+         guards live in the admin_set_user_role RPC instead; non-role admin
+         edits have no product need).
+       * user_checks: admin SELECT (today own-rows only), user SELECT own.
+       * global_risk_evaluations: admin SELECT via elevated predicate.
+       * registry_blacklist stays world-readable (bot queries anon).
+       * accounts: RLS off — do NOT touch.
+     - RPC admin_set_user_role(p_user_id uuid, p_role text) SECURITY DEFINER,
+       `SET search_path = public`:
+       * Guard option (b): caller role in (root_admin, moderator) required;
+         only root_admin may grant 'root_admin';
+         moderator may set only user|support|moderator;
+         no self-edit; cannot demote/lock out the last active root_admin;
+         must set profiles.role (sync_admin_flag_with_role trigger keeps
+         is_admin in sync); returns void or raises with clear messages.
+     - Grants: EXECUTE to authenticated only.
+
+STOP here and wait for user command (protocol step 2).
+
+=====================================================================
+PHASE T — PLAN-MODE TEST CYCLE (read-only; on user command)
+=====================================================================
+T1. `npx supabase db push --dry-run` — must list exactly these 16 files in
+    lexicographic order; first attempt timed out on CLI auth flakiness —
+    retry with long timeout; if auth retries, re-run.
+T2. Catalog cross-check (read-only `npx supabase db query --linked`), per
+    fixed file: every function referenced exists with matching signature/
+    return type; every table/column referenced exists or is created by an
+    earlier file; enum values; extension schemas; PG version() >= 12;
+    migration list shows no remote-only drift.
+    Already confirmed live (do not re-prove): pgcrypto in extensions;
+    array_distinct missing; screen_person_name 6-col; lookup_api_key 5-col;
+    approve/reject_report void(uuid); helper fns absent; notifications/
+    user_checks columns match; profiles.role absent; bank_codes/
+    registry_aliases/alert_queue/runner_heartbeat absent.
+T3. Static structural review of the four touched files: syntax, dependency
+    order (0010 role -> 0006000001 trigger; 0006 CROWDSOURCED ->
+    approve_report insert; 0006000002 helpers -> 0006000004 policies),
+    one transaction per file, no cross-file partial state.
+T4. Output: pass/fail table per migration with exact errors.
+
+=====================================================================
+PHASE F — FIX/TEST LOOP (until 100% green)
+=====================================================================
+Fix -> user commands re-test -> T1-T4 again. Criteria for "aligned":
+- Functional: callers/return types/signatures match live catalog exactly;
+  no missing function/column at create or runtime (search_path included).
+- Structural: parses clean, dependency order holds, one tx per file.
+Loop may repeat any number of times.
+
+=====================================================================
+PHASE P — REAL PUSH (only on user's explicit "push" command)
+=====================================================================
+P1. `npx supabase db push` (retry-on-failure semantics: resumes at failed
+    file — if it fails, back to Phase F for that file only).
+P2. Verify: migration list all applied; POC lockdown trigger exists;
+    lookup_api_key returns 7 cols w/ scope enforcement; admin_issue_api_key
+    smoke test (key created, hash/epoch/salt prefixes, scopes JSON);
+    admin_set_user_role guard probes (moderator cannot grant root_admin,
+    self-edit blocked, last root_admin protected); 0006000004 policies
+    behave (non-admin sees own profile only, empty user_checks; admin sees
+    all).
+P3. Deploy risk-check edge AFTER push (old lookup_api_key lacks scopes —
+    deploying before push would 403 all B2B calls):
+    `npx supabase functions deploy risk-check`.
+P4. Post-deploy: live key smoke test (401 without key, 403 wrong scope,
+    200 with proper key; 429 on burst).
+
+=====================================================================
+PHASE B — ADMIN FRONTEND (after P)
+=====================================================================
+B1. src/components/admin/AdminStatsOverview.tsx — aggregate stats cards
+    (tenants, keys, usage from v_tenant_monthly_usage).
+B2. src/components/admin/UserManagement.tsx — user list w/ role dropdown
+    -> admin_set_user_role RPC; hide root_admin option for moderators;
+    show current role badges (root_admin/moderator/support/user).
+B3. 10-row client-side pagination in B2BTenantsKeys (and UserManagement).
+B4. DashboardPage: fetch profile.role (currently pending) and gate the
+    admin tab on role/current_profile_role(); admin widgets only in admin
+    tab (clean-forward rule).
+B5. RLS probes from P2. Entry 018 in updates.txt (Phase 0 + T + P + B).
+B6. Verify: tsc 0 errors, eslint 0, vitest 53/53, build success.
+B7. git commit + push.
+
+=====================================================================
+PHASE D — BACKLOG (NOT now; per upcoming plan changes)
+=====================================================================
+- AG SHIELD\shield-scanner\ sibling app (ReconFlowV2, seed scans,
+  executive summary, OpenSpecs docs) per archived spec.
+- TechVerse content panel on existing events tab (archived copy);
+  TechVerse Showdown data: 4 rounds + 6 challenges — register via event
+  type on existing `events` table + detail modal; keep current shell.
+- Build WhatsApp bot per whatsapp-bot-plan/ (env vars above).
+- Qdrant/pgvector NDPA-compliant vector layer + admin review surface.
+- Risk Architecture Evolution — Phase 1 expert handoff (option table in
+  archived source; de-prioritize while RLS hardening lands).
+
+=====================================================================
+STANDING RULES (from archived clean-forward section — still binding)
+=====================================================================
+- Clean forward: never wipe/rebuild working code; additive fixes only;
+  read entire target file before any edit; verify with real build.
+- Tab isolation: admin widgets only in admin tab; gate on role /
+  current_profile_role(); regular users never see admin UI.
+- Strict dependency diet: zero new npm packages (jsPDF/html2canvas were
+  removed — do not re-add). Native HTML/CSS/Postgres/edge functions only.
+- Pagination: admin tables 10-20 rows/page.
+- Read whole files (no line-based sed/Python surgery). Each migration file
+  = one transaction.
+- Architecture authority: updates.txt Entries 015+; project guide for
+  Edge/Dashboard invariants; Domain layer stays pure (Entry 016 rule).
+- API keys: hashed at rest (sha256 + epoch/salt prefixes), scopes JSON,
+  90-day default lifetime, monthly quotas — enforced in edge fn.
+- Roles (0010/0012/0006000004): root_admin, moderator, support, user;
+  is_admin mirrors role != 'user' via sync trigger; trigger-lockdown on
+  profiles (0006000001) protects role/is_admin/id from non-service edits.
+
+Status tracker: [x] Phase C planned [ ] C done [ ] Phase 0 done
+[ ] T green [ ] F loop closed [ ] P pushed+verified [ ] B done [ ] D backlog

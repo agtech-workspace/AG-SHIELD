@@ -118,9 +118,8 @@ serve(async (req) => {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
   const sandboxHeader = req.headers.get('x-sandbox')
 
-  let channel: 'API_B2B' | 'NATIVE_B2C' = 'NATIVE_B2C'
   let tenantId: string | null = null
-  let includeSandbox = true
+  let includeSandbox: boolean
 
   if (apiKey) {
     // B2B path — tenant auth key + quota enforcement
@@ -133,7 +132,6 @@ serve(async (req) => {
       )
     }
     const t = tenant[0]
-    channel = 'API_B2B'
     tenantId = t.tenant_id
     includeSandbox = sandboxHeader === 'true'
 
@@ -184,8 +182,13 @@ serve(async (req) => {
         { status: 401, headers: jsonHeaders() }
       )
     }
-    channel = 'NATIVE_B2C'
     includeSandbox = true
+  } else {
+    // No API key and no session token: refuse before touching the risk engine
+    return new Response(
+      JSON.stringify({ error: 'Authentication required (X-API-Key or Bearer token)' }),
+      { status: 401, headers: jsonHeaders() }
+    )
   }
 
   try {
@@ -211,9 +214,6 @@ serve(async (req) => {
       p_is_new_recipient: is_new_recipient ?? true,
       p_include_sandbox: includeSandbox,
       p_holder_name: resolvedHolder,
-    }
-    if (channel === 'API_B2B') {
-      rpcParams.p_include_osint = false
     }
     const { data, error } = await supabase.rpc('assess_transfer_risk', rpcParams)
     if (error) throw error

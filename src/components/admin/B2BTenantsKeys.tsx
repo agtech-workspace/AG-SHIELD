@@ -32,6 +32,7 @@ interface UsageRow {
 }
 
 const SCOPE_OPTIONS = ['verify:read', 'verify:write'] as const
+const PAGE_SIZE = 10
 
 export default function B2BTenantsKeys() {
   const client = () => {
@@ -55,8 +56,9 @@ export default function B2BTenantsKeys() {
   const [issueScopes, setIssueScopes] = useState<string[]>(['verify:read'])
   const [issueExpiry, setIssueExpiry] = useState('')
 
-  const [freshKey, setFreshKey] = useState<string | null>(null)
+const [freshKey, setFreshKey] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [page, setPage] = useState(0)
 
   const fetchAll = useCallback(async () => {
     if (!supabase) return { error: null, tenants: [] as Tenant[], keys: [] as ApiKey[], usage: [] as UsageRow[] }
@@ -192,9 +194,13 @@ export default function B2BTenantsKeys() {
     }
   }
 
-  const currentMonth = new Date().toISOString().slice(0, 7)
+const currentMonth = new Date().toISOString().slice(0, 7)
   const usageFor = (tenantId: string) =>
     usage.find((u) => u.tenant_id === tenantId && u.usage_month.slice(0, 7) === currentMonth)
+
+  const pageCount = Math.max(1, Math.ceil(tenants.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount - 1)
+  const pageTenants = tenants.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
   if (loading) {
     return (
@@ -294,11 +300,11 @@ export default function B2BTenantsKeys() {
         </div>
       </div>
 
-      {tenants.length === 0 ? (
+{tenants.length === 0 ? (
         <p className="text-gray-500 text-center py-6">No tenants yet. Create one above.</p>
       ) : (
         <div className="space-y-4">
-          {tenants.map((tenant) => {
+          {pageTenants.map((tenant) => {
             const tenantKeys = keys.filter((k) => k.tenant_id === tenant.id)
             const monthUsage = usageFor(tenant.id)
             return (
@@ -449,9 +455,34 @@ export default function B2BTenantsKeys() {
                     </tbody>
                   </table>
                 )}
-              </div>
+</div>
             )
           })}
+        </div>
+      )}
+
+      {tenants.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-3">
+          <span>
+            Showing {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, tenants.length)} of{' '}
+            {tenants.length}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-2 py-1 border rounded hover:bg-gray-50 disabled:opacity-40"
+            >
+              ← Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage >= pageCount - 1}
+              className="px-2 py-1 border rounded hover:bg-gray-50 disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
         </div>
       )}
     </div>

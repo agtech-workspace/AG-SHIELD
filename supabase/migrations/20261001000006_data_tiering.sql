@@ -25,8 +25,8 @@ END$$;
 -- Backfill
 UPDATE public.registry_blacklist
 SET data_tier = CASE
-  WHEN upper(source_agency) IN ('CROWDSOURCED') THEN 'OSINT'
-  WHEN upper(source_agency) IN ('SANCTIONS','INTERPOL','EFCC','ICP_NIGERIA','CAC','CIPC_SA') THEN 'OFFICIAL'
+  WHEN upper(source_agency::text) IN ('CROWDSOURCED') THEN 'OSINT'
+  WHEN upper(source_agency::text) IN ('SANCTIONS','INTERPOL','EFCC','ICP_NIGERIA','CAC','CIPC_SA') THEN 'OFFICIAL'
   ELSE 'OFFICIAL'
 END
 WHERE data_tier IS NULL OR data_tier = '';

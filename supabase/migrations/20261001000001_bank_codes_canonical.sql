@@ -44,8 +44,8 @@ VALUES
 ON CONFLICT (canonical_code) DO UPDATE SET
   nip3 = COALESCE(EXCLUDED.nip3, bank_codes.nip3),
   nip6 = COALESCE(EXCLUDED.nip6, bank_codes.nip6),
-  provider_codes = array_distinct(COALESCE(bank_codes.provider_codes, '{}') || COALESCE(EXCLUDED.provider_codes, '{}')),
-  aliases = array_distinct(COALESCE(bank_codes.aliases, '{}') || COALESCE(EXCLUDED.aliases, '{}')),
+  provider_codes = ARRAY(SELECT DISTINCT unnest(COALESCE(bank_codes.provider_codes, '{}') || COALESCE(EXCLUDED.provider_codes, '{}'))),
+  aliases = ARRAY(SELECT DISTINCT unnest(COALESCE(bank_codes.aliases, '{}') || COALESCE(EXCLUDED.aliases, '{}'))),
   bank_name = COALESCE(EXCLUDED.bank_name, bank_codes.bank_name),
   updated_at = NOW();
 
