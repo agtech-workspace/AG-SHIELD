@@ -6,10 +6,11 @@ import { supabase } from '../lib/supabase'
 import { clearDemoSession, isDemoMode } from '../lib/demoAuth'
 import { processRisk, type RiskInput } from '../lib/riskEngine'
 import { getMockAccount } from '../lib/mockData'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import { ACCOUNT_NUMBER_LENGTH, BANK_CODES, BANKS, HIGH_AMOUNT_THRESHOLD, HISTORY_MAX_ITEMS, REPORT_CATEGORIES } from '../lib/constants'
 import { AlertTriangle, ArrowRight, Award, CheckCircle, Search, Loader2, User, AlertCircle as AlertIcon, Bell, X } from 'lucide-react'
 import Gauge from '../components/Gauge'
+import B2BTenantsKeys from '../components/admin/B2BTenantsKeys'
+import RunnerHeartbeat from '../components/admin/RunnerHeartbeat'
 import { TOUR_STEPS, TOUR_LOCALE } from '../components/tourSteps'
 
 type RiskLevel = 'safe' | 'warning' | 'high_risk'
@@ -348,17 +349,9 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [subscribeName, setSubscribeName] = useState('')
   const [subscribeFeedback, setSubscribeFeedback] = useState('')
 
-  const exportHistoryPDF = async () => {
-    const element = document.getElementById('recent-activity')
-    if (!element || history.length === 0) return
-    const canvas = await html2canvas(element, { scale: 2 })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const imgProps = pdf.getImageProperties(imgData)
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-    pdf.save('search-history.pdf')
+  const exportHistoryPDF = () => {
+    if (history.length === 0) return
+    window.print()
   }
 
   useEffect(() => {
@@ -925,18 +918,33 @@ export default function DashboardPage({ session }: { session: Session }) {
                   <div className="mb-4">
                     <p className="text-slate-500 text-[10px] font-medium tracking-[0.12em] uppercase mb-2">Watchlist Matches</p>
                     <div className="flex flex-wrap gap-2">
-                      {result.sourceRegistry.map((src) => (
-                        <span
-                          key={src}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                            src === 'PEP'
-                              ? 'bg-amber-950/40 border-amber-700/40 text-amber-300'
-                              : 'bg-red-950/50 border-red-800/50 text-red-300'
-                          }`}
-                        >
-                          {src === 'PEP' ? 'Politically Exposed Person' : `${src} Watchlist`}
-                        </span>
-                      ))}
+                      {result.sourceRegistry.map((src) => {
+                        const tier = src.toUpperCase() === 'CROWDSOURCED' ? 'Community' : 'Official'
+                        return (
+                          <span
+                            key={src}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                              src === 'PEP'
+                                ? 'bg-amber-950/40 border-amber-700/40 text-amber-300'
+                                : 'bg-red-950/50 border-red-800/50 text-red-300'
+                            }`}
+                          >
+                            {src === 'PEP' ? 'Politically Exposed Person' : `${src} Watchlist`}
+                            <span
+                              className={`ml-1.5 text-[9px] font-medium uppercase tracking-wider ${
+                                tier === 'Official' ? 'opacity-80' : 'opacity-60 italic'
+                              }`}
+                              title={
+                                tier === 'Official'
+                                  ? 'Verified government / official registry source'
+                                  : 'Community-reported (OSINT) source - may be included or excluded by source policy'
+                              }
+                            >
+                              {tier}
+                            </span>
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -1193,6 +1201,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   )}
                   {history.length > 0 && <span className="text-xs text-gray-400">{history.length} total checks</span>}
                 </div>
+              </div>
               {history.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-3xl mb-2 opacity-30">🔍</div>
@@ -2166,6 +2175,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         )}
 
         {activeTab === 'admin' && profile?.is_admin && (
+          <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow max-w-3xl">
             <h2 className="text-lg font-semibold mb-4">Pending Reports Review</h2>
             {pendingReports.length === 0 ? (
@@ -2212,6 +2222,9 @@ export default function DashboardPage({ session }: { session: Session }) {
                 ))}
               </div>
             )}
+          </div>
+          <B2BTenantsKeys />
+          <RunnerHeartbeat />
           </div>
         )}
       </div>

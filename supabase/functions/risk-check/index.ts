@@ -136,11 +136,43 @@ serve(async (req) => {
     channel = 'API_B2B'
     tenantId = t.tenant_id
     includeSandbox = sandboxHeader === 'true'
+
+    // Scope enforcement (Feature 3): verify:read is the default B2B scope
+    const scopes: string[] = Array.isArray(t.scopes) ? t.scopes : []
+    if (!scopes.includes('verify:read')) {
+      return new Response(
+        JSON.stringify({ error: 'API key missing required scope: verify:read' }),
+        { status: 403, headers: jsonHeaders() }
+      )
+    }
+
     const burst = t.burst_limit ?? 100
     if (!checkBucket(tenantId, apiKey.slice(0, 8), burst)) {
       return new Response(
         JSON.stringify({ error: 'Tenant rate limit exceeded', retry_after_seconds: 60 }),
         { status: 429, headers: jsonHeaders({ 'Retry-After': '60' }) }
+      )
+    }
+
+    // Postgres-only metering + monthly quota cutoff (Feature 3, shadow billing)
+    const { data: usageData, error: usageErr } = await supabase.rpc('bump_api_key_usage', {
+      p_key_hash: keyHash,
+    })
+    if (usageErr) {
+      return new Response(
+        JSON.stringify({ error: 'Usage metering unavailable' }),
+        { status: 503, headers: jsonHeaders() }
+      )
+    }
+    const usage = Array.isArray(usageData) ? usageData[0] : usageData
+    if (!usage || usage.p_allowed !== true) {
+      return new Response(
+        JSON.stringify({
+          error: 'Monthly quota reached. Contact support to increase your limit.',
+          calls_used: usage?.p_calls_used ?? null,
+          monthly_quota: usage?.p_quota ?? null,
+        }),
+        { status: 429, headers: jsonHeaders() }
       )
     }
   } else if (token && token !== 'undefined') {

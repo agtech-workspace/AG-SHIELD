@@ -42,9 +42,31 @@ try:
         finally:
             if conn:
                 conn.close()
+
+    def process_alert_queue(batch_size: int = 200) -> int:
+        """Feature 3 step 6: drain blacklist_alert_queue -> scoped notifications."""
+        url = os.environ.get("DATABASE_URL")
+        if not url:
+            logger.info("DATABASE_URL not set; skipping blacklist alert queue")
+            return 0
+        conn = psycopg2.connect(url)
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT public.process_blacklist_alert_queue(%s)", (batch_size,))
+            count = int(cur.fetchone()[0] or 0)
+            conn.commit()
+            cur.close()
+            if count:
+                logger.info("blacklist alert queue: %s entries processed", count)
+            return count
+        finally:
+            conn.close()
 except Exception:
     def heartbeat(service: str, status: str = "ok", details: Dict[str, Any] | None = None) -> None:
         return
+
+    def process_alert_queue(batch_size: int = 200) -> int:
+        return 0
 
 TASKS: List[Dict[str, Any]] = [
     {
@@ -56,6 +78,11 @@ TASKS: List[Dict[str, Any]] = [
         "name": "opensanctions_sync",
         "interval_hours": 24,
         "func": lambda: run_registry_ingestion_cycle(),
+    },
+    {
+        "name": "blacklist_alert_processor",
+        "interval_hours": 0.25,
+        "func": lambda: process_alert_queue(200),
     },
 ]
 

@@ -28,3 +28,22 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-slate-blue to-blue-400;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #recent-activity,
+  #recent-activity * {
+    visibility: visible;
+  }
+
+  #recent-activity {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
+}
