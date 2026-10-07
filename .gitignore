@@ -22,6 +22,10 @@ backup_data.sql
 
 # Planning/secret notes (contains service_role key — keep out of git)
 goals.txt
+future_feature_plans.txt
+future_feature_plans_source_material_archive.txt
+updates.txt
+prompts_to_ upgrade your thinking always_you must visit this thinking for every tough task or complex work or user confusion.txt
 
 # Editor directories and files
 .vscode/*
