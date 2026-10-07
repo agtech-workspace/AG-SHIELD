@@ -1,42 +1,47 @@
 :root {
-  --bg: #f4f6fb;
+  /* AG brand tokens (agtechafrica.org) */
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #eef1f8;
-  --border: #e2e6ef;
-  --text: #17233b;
-  --muted: #6b7a95;
-  --brand: #3347f0;
+  --surface-2: #f0f2f8;
+  --border: rgba(25, 25, 111, 0.09);
+  --text: #0a0a1e;
+  --muted: #8888aa;
+  --brand: #19196f;
   --brand-ink: #ffffff;
+  --teal: #08a698;
+  --green: #147918;
   --safe-bg: #e6f6ed;
-  --safe-fg: #0e7a3d;
+  --safe-fg: #147918;
   --review-bg: #fff3dc;
   --review-fg: #9a5b00;
   --block-bg: #fdeaea;
   --block-fg: #b42318;
-  --chip-bg: #eceffb;
-  --chip-fg: #3347f0;
-  --shadow: 0 6px 24px rgba(23, 35, 59, 0.08);
+  --chip-bg: rgba(8, 166, 152, 0.10);
+  --chip-fg: #08a698;
+  --shadow: 0 6px 24px rgba(25, 25, 111, 0.08);
   --radius: 14px;
   --maxw: 1080px;
 }
 
 [data-theme='dark'] {
-  --bg: #0d1220;
-  --surface: #151b2d;
-  --surface-2: #1c2440;
-  --border: #26304f;
-  --text: #eaeefb;
-  --muted: #94a1c3;
-  --brand: #6a7bff;
+  --bg: #07071a;
+  --surface: #0e0e28;
+  --surface-2: #17173a;
+  --border: rgba(255, 255, 255, 0.07);
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.5);
+  --brand: #19196f;
   --brand-ink: #ffffff;
+  --teal: #08a698;
+  --green: #147918;
   --safe-bg: #123325;
   --safe-fg: #54d98d;
   --review-bg: #3a2b12;
   --review-fg: #f5c264;
   --block-bg: #3a1714;
   --block-fg: #ff8a80;
-  --chip-bg: #1c2440;
-  --chip-fg: #9fb0ff;
+  --chip-bg: #17173a;
+  --chip-fg: #08a698;
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -340,10 +345,33 @@ input, select, textarea { font: inherit; color: var(--text); }
 .footer { color: var(--muted); font-size: 0.8rem; text-align: center; padding: 28px 0 40px; }
 
 /* ---------- Print ---------- */
+.print-sheet { display: none; }
+
 @media print {
+  @page { margin: 14mm; }
   body { background: #fff; color: #000; }
-  .topbar, .top-actions, .no-print, .overlay { display: none !important; }
-  .card { box-shadow: none; border: 1px solid #ccc; }
-  .container { max-width: 100%; }
-  .verdict[data-verdict] { background: #fff !important; border-width: 2px; }
+  .app-shell { display: none !important; }
+  .print-sheet {
+    display: block;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    color: #000;
+  }
+  .print-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid #000;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .print-head strong { font-size: 16px; letter-spacing: -0.2px; }
+  .print-head span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .print-meta { font-size: 10px; color: #444; margin: 0 0 12px; }
+  .print-empty { font-size: 12px; color: #444; }
+  .print-sheet table { width: 100%; border-collapse: collapse; }
+  .print-sheet th, .print-sheet td { border: 1px solid #999; padding: 6px 8px; text-align: left; vertical-align: top; }
+  .print-sheet th { background: #eee; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .print-sheet td { font-size: 10.5px; }
+  .print-foot { margin-top: 14px; font-size: 9px; color: #555; }
 }

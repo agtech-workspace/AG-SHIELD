@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase, getSession, isConfigured } from './lib/supabase'
+import { supabase, isConfigured } from './lib/supabase'
+import { getSession, onAuthStateChange, signOut as authSignOut } from './lib/auth'
+import { LoginDialog } from './components/LoginDialog'
 import {
   BANKS,
   sanitizeAccount,
@@ -99,11 +101,7 @@ export function App() {
   const [wlDone, setWlDone] = useState(false)
 
   const [session, setSession] = useState<Session | null>(null)
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
-  const [authEmail, setAuthEmail] = useState('')
-  const [authPass, setAuthPass] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
-  const [authMsg, setAuthMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [loginOpen, setLoginOpen] = useState(false)
 
   const [reports, setReports] = useState<MyReport[] | null>(null)
   const [reportsLoading, setReportsLoading] = useState(false)
@@ -168,11 +166,16 @@ export function App() {
   }
 
   useEffect(() => {
-    void (async () => {
-      const current = await getSession()
-      setSession(current)
-      if (current) void loadMyReports(current.user.id)
-    })()
+    const unsubscribe = onAuthStateChange((sess) => {
+      setSession(sess)
+      if (sess) void loadMyReports(sess.user.id)
+      else setReports(null)
+    })
+    void getSession().then((sess) => {
+      setSession(sess)
+      if (sess) void loadMyReports(sess.user.id)
+    })
+    return () => { unsubscribe?.() }
   }, [])
 
   async function handleScan(event: FormEvent) {
@@ -213,44 +216,8 @@ export function App() {
     window.print()
   }
 
-  async function handleAuth(event: FormEvent) {
-    event.preventDefault()
-    if (!supabase) return
-    setAuthBusy(true)
-    setAuthMsg(null)
-    try {
-      if (authMode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPass })
-        if (error) {
-          if (error.message.toLowerCase().includes('already') || error.code === 'user_already_exists') {
-            setAuthMsg({ ok: true, text: 'Account exists — try signing in instead.' })
-          } else {
-            throw error
-          }
-        } else {
-          if (data.session) {
-            setSession(data.session)
-            void loadMyReports(data.session.user.id)
-          } else {
-            setAuthMsg({ ok: true, text: 'Confirmation email sent — verify to activate reporting.' })
-          }
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPass })
-        if (error) throw error
-        setSession(data.session)
-        void loadMyReports(data.session.user.id)
-      }
-    } catch (error) {
-      setAuthMsg({ ok: false, text: error instanceof Error ? error.message : 'Authentication failed.' })
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
   async function handleSignOut() {
-    if (!supabase) return
-    await supabase.auth.signOut()
+    await authSignOut()
     setSession(null)
     setReports(null)
   }
@@ -345,6 +312,7 @@ export function App() {
 
   return (
     <>
+      <div className="app-shell">
       <header className="topbar no-print">
         <div className="container topbar-inner">
           <div className="brand">
@@ -355,6 +323,17 @@ export function App() {
             </span>
           </div>
           <div className="top-actions">
+            {session ? (
+              <button type="button" className="icon-btn" onClick={() => void handleSignOut()} aria-label="Sign out">
+                {ICONS.user}
+                {session.user.email ?? 'Account'}
+              </button>
+            ) : (
+              <button type="button" className="icon-btn" onClick={() => setLoginOpen(true)} aria-label="Sign in">
+                {ICONS.user}
+                Sign in
+              </button>
+            )}
             <button
               type="button"
               className="icon-btn"
@@ -423,7 +402,7 @@ export function App() {
                   <span className="pill">{result.tier}</span>
                 </div>
                 <span className="hist-when">
-                  {result.source === 'live' ? 'Live data' : 'Demo heuristics'} · score {result.score}/100
+                  Score {result.score}/100
                 </span>
               </div>
               <ul>
@@ -479,31 +458,19 @@ export function App() {
               {!configured && (
                 <div className="banner err">
                   {ICONS.alert}
-                  <span>This build isn't connected to a backend yet — add VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (see README) for live reporting.</span>
+                  <span>Live reporting needs the AG SHIELD backend — add VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (see README).</span>
                 </div>
               )}
               {configured && !session && (
-                <form className="auth-panel" onSubmit={handleAuth}>
-                  <h3 style={{ margin: '0 0 4px' }}>{authMode === 'signin' ? 'Sign in' : 'Create account'}</h3>
-                  <div className="field">
-                    <label htmlFor="authEmail">Email</label>
-                    <input id="authEmail" type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="authPass">Password</label>
-                    <input id="authPass" type="password" required minLength={6} value={authPass} onChange={(e) => setAuthPass(e.target.value)} />
-                  </div>
-                  <button type="submit" className="btn" disabled={authBusy}>
-                    {authBusy ? <span className="spinner" /> : ICONS.user}
-                    {authMode === 'signin' ? 'Sign in' : 'Create account'}
-                  </button>{' '}
-                  <button type="button" className="btn btn-ghost" onClick={() => setAuthMode((m) => (m === 'signin' ? 'signup' : 'signin'))}>
-                    {authMode === 'signin' ? 'I need an account' : 'Back to sign in'}
+                <div className="auth-panel">
+                  <strong>Sign in to submit a report</strong>
+                  <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '6px 0 12px' }}>
+                    Use the same AG SHIELD account as the parent app — reports stay linked to you.
+                  </p>
+                  <button type="button" className="btn" onClick={() => setLoginOpen(true)}>
+                    {ICONS.user} Sign in
                   </button>
-                  {authMsg && (
-                    <div className={`banner ${authMsg.ok ? 'ok' : 'err'}`}>{authMsg.ok ? ICONS.check : ICONS.alert}<span>{authMsg.text}</span></div>
-                  )}
-                </form>
+                </div>
               )}
 
               {configured && session && !reportSubmitted && (
@@ -689,7 +656,7 @@ export function App() {
       </main>
 
       <footer className="footer">
-        Shield by AG Tech · built on the AG SHIELD risk engine · demo heuristics used when no backend is configured
+        Shield by AG Tech · the Truecaller for bank apps · built on the AG SHIELD risk engine
       </footer>
 
       {showModal && (
@@ -745,6 +712,50 @@ export function App() {
           </div>
         </div>
       )}
+
+      {loginOpen && (
+        <LoginDialog session={session} onClose={() => setLoginOpen(false)} />
+      )}
+      </div>
+
+      <section className="print-sheet" aria-label="Scan history audit trail">
+        <header className="print-head">
+          <strong>Shield by AG Tech</strong>
+          <span>Scan History Audit Trail</span>
+        </header>
+        <p className="print-meta">Generated {new Date().toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+        {history.length === 0 ? (
+          <p className="print-empty">No scans on record.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Bank</th>
+                <th>Verdict</th>
+                <th>Tier</th>
+                <th>Score</th>
+                <th>When</th>
+                <th>Reasons</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((item) => (
+                <tr key={item.id}>
+                  <td>{maskAccount(item.result.account)}</td>
+                  <td>{item.result.bank}</td>
+                  <td>{VERDICT_LABEL[item.result.verdict] ?? item.result.verdict}</td>
+                  <td>{item.result.tier}</td>
+                  <td>{item.result.score}/100</td>
+                  <td>{new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                  <td>{item.result.reasons.join('; ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="print-foot">Generated by Shield by AG Tech · the Truecaller for bank apps</p>
+      </section>
     </>
   )
 }
