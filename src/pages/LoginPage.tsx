@@ -188,7 +188,7 @@ export default function LoginPage({ session }: Props) {
                   placeholder="you@example.com"
                   autoComplete="email"
                   required
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-green-500 transition"
                 />
               </div>
 
@@ -202,7 +202,7 @@ export default function LoginPage({ session }: Props) {
                     placeholder="••••••••"
                     autoComplete={isRegister ? 'new-password' : 'current-password'}
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-green-500 transition"
                   />
                   <button
                     type="button"
@@ -240,14 +240,14 @@ export default function LoginPage({ session }: Props) {
                     placeholder="Your name"
                     autoComplete="nickname"
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-green-500 transition"
                   />
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-brand-teal text-brand-deep py-2.5 rounded-lg text-sm font-medium hover:bg-teal-600 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 disabled={loading}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -306,13 +306,13 @@ export default function LoginPage({ session }: Props) {
                     placeholder="you@example.com"
                     autoComplete="email"
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-green-500 transition"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full bg-brand-teal text-brand-deep py-2.5 rounded-lg text-sm font-medium hover:bg-teal-600 active:scale-[0.99] transition disabled:opacity-50 flex items-center justify-center gap-2"
                   disabled={loading}
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

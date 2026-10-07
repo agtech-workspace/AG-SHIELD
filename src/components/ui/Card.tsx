@@ -11,7 +11,7 @@ export function Card({ children, className, style }: CardProps) {
   return (
     <article
       className={cn(
-        'rounded-lg border border-gray-200 bg-white p-6 shadow-sm',
+        'rounded-xl border border-gray-200 bg-white p-6 shadow-sm',
         className
       )}
       style={style}

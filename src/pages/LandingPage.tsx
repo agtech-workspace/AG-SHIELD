@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { Shield, Search, Users, Award, Menu, X, ArrowRight, CheckCircle, Smartphone, Building2 } from 'lucide-react'
+import ThemeToggle from '../components/ThemeToggle'
 import { ACCOUNT_NUMBER_LENGTH } from '../lib/constants'
 
 type Props = { session: Session | null }
@@ -49,11 +50,12 @@ export default function LandingPage({ session }: Props) {
               <a href="#features" className="text-sm text-gray-600 hover:text-green-600 font-medium transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm text-gray-600 hover:text-green-600 font-medium transition-colors">How It Works</a>
               <a href="#stats" className="text-sm text-gray-600 hover:text-green-600 font-medium transition-colors">Impact</a>
+              <ThemeToggle />
               {session ? (
                 <button
                   type="button"
                   onClick={() => navigate('/dashboard')}
-                  className="px-5 py-2 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 shadow-lg shadow-green-500/25 transition-all hover:shadow-xl hover:shadow-green-500/30"
+                  className="px-5 py-2 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold hover:bg-teal-600 shadow-lg shadow-teal-500/25 transition-all hover:shadow-xl hover:shadow-green-500/30"
                 >
                   Dashboard
                 </button>
@@ -61,16 +63,19 @@ export default function LandingPage({ session }: Props) {
                 <button
                   type="button"
                   onClick={() => navigate('/login')}
-                  className="px-5 py-2 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 shadow-lg shadow-green-500/25 transition-all hover:shadow-xl hover:shadow-green-500/30"
+                  className="px-5 py-2 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold hover:bg-teal-600 shadow-lg shadow-teal-500/25 transition-all hover:shadow-xl hover:shadow-green-500/30"
                 >
                   Get Started
                 </button>
               )}
             </div>
 
-            <button type="button" className="md:hidden p-2 text-gray-600" onClick={() => setMenuOpen(!menuOpen)}>
-              {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <button type="button" className="md:hidden p-2 text-gray-600" onClick={() => setMenuOpen(!menuOpen)}>
+                {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -79,12 +84,16 @@ export default function LandingPage({ session }: Props) {
             <a href="#features" className="block text-sm text-gray-600 py-2" onClick={() => setMenuOpen(false)}>Features</a>
             <a href="#how-it-works" className="block text-sm text-gray-600 py-2" onClick={() => setMenuOpen(false)}>How It Works</a>
             <a href="#stats" className="block text-sm text-gray-600 py-2" onClick={() => setMenuOpen(false)}>Impact</a>
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-sm text-gray-500">Appearance</span>
+              <ThemeToggle />
+            </div>
             {session ? (
-              <button type="button" onClick={() => { setMenuOpen(false); navigate('/dashboard') }} className="w-full px-5 py-2 bg-green-600 text-white rounded-full text-sm font-semibold">
+              <button type="button" onClick={() => { setMenuOpen(false); navigate('/dashboard') }} className="w-full px-5 py-2 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold">
                 Dashboard
               </button>
             ) : (
-              <button type="button" onClick={() => { setMenuOpen(false); navigate('/login') }} className="w-full px-5 py-2 bg-green-600 text-white rounded-full text-sm font-semibold">
+              <button type="button" onClick={() => { setMenuOpen(false); navigate('/login') }} className="w-full px-5 py-2 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold">
                 Get Started
               </button>
             )}
@@ -116,7 +125,7 @@ export default function LandingPage({ session }: Props) {
                   <input
                     type="text"
                     placeholder="Enter account number to check..."
-                    className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 shadow-sm"
+                    className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-green-500 shadow-sm"
                     maxLength={ACCOUNT_NUMBER_LENGTH}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -132,7 +141,7 @@ export default function LandingPage({ session }: Props) {
                 <button
                   type="button"
                   onClick={() => navigate(session ? '/dashboard' : '/login')}
-                  className="px-8 py-3.5 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 shadow-lg shadow-green-500/30 transition-all hover:shadow-xl inline-flex items-center gap-2 justify-center"
+                  className="px-8 py-3.5 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold hover:bg-teal-600 shadow-lg shadow-teal-500/30 transition-all hover:shadow-xl inline-flex items-center gap-2 justify-center"
                 >
                   {session ? 'Go to Dashboard' : 'Start Free'} <ArrowRight className="w-4 h-4" />
                 </button>
@@ -298,7 +307,7 @@ export default function LandingPage({ session }: Props) {
             <button
               type="button"
               onClick={() => navigate(session ? '/dashboard' : '/login')}
-              className="px-8 py-3.5 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 shadow-lg shadow-green-500/30 transition-all hover:shadow-xl inline-flex items-center gap-2 justify-center"
+              className="px-8 py-3.5 bg-brand-teal text-brand-deep rounded-full text-sm font-semibold hover:bg-teal-600 shadow-lg shadow-teal-500/30 transition-all hover:shadow-xl inline-flex items-center gap-2 justify-center"
             >
               {session ? 'Open Dashboard' : 'Get Started Free'} <ArrowRight className="w-4 h-4" />
             </button>

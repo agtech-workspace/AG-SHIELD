@@ -22,7 +22,7 @@ export function Button({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         'disabled:pointer-events-none disabled:opacity-50',
         {
-          'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500': variant === 'primary',
+          'bg-brand-teal text-brand-deep hover:bg-teal-600 focus-visible:ring-teal-500': variant === 'primary',
           'bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-500': variant === 'secondary',
           'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500': variant === 'danger',
           'bg-transparent hover:bg-gray-100 focus-visible:ring-gray-500': variant === 'ghost',

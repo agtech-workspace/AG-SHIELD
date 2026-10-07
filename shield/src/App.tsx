@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, isConfigured } from './lib/supabase'
 import { getSession, onAuthStateChange, signOut as authSignOut } from './lib/auth'
 import { LoginDialog } from './components/LoginDialog'
 import { EventPanel } from './components/EventPanel'
+import { AdminPanel } from './components/AdminPanel'
 import { ICONS } from './lib/icons'
 import {
   BANKS,
@@ -66,6 +67,10 @@ function loadHistory(): HistoryItem[] {
   }
 }
 
+function evidenceFileName(account: string, ext: string): string {
+  return `${Date.now()}_${account}.${ext}`
+}
+
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(themeInit)
   const [history, setHistory] = useState<HistoryItem[]>(loadHistory)
@@ -75,7 +80,9 @@ export function App() {
   const [account, setAccount] = useState('')
   const [bank, setBank] = useState<string>(BANKS[0])
 
-  const [tab, setTab] = useState<'scanner' | 'events'>('scanner')
+  const [tab, setTab] = useState<'scanner' | 'events' | 'admin'>('scanner')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const loginRecorded = useRef(false)
   const [showModal, setShowModal] = useState(false)
 
   const [session, setSession] = useState<Session | null>(null)
@@ -160,6 +167,31 @@ export function App() {
     return () => { unsubscribe?.() }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadAdminRole() {
+      setIsAdmin(false)
+      if (!supabase || !session) return
+      const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).maybeSingle()
+      if (cancelled) return
+      const role = (data as { role?: string | null } | null)?.role
+      const email = (session.user.email ?? '').toLowerCase()
+      setIsAdmin(role === 'root_admin' || role === 'moderator' || email === 'agtechrelations@gmail.com')
+    }
+    void loadAdminRole()
+    return () => { cancelled = true }
+  }, [session])
+
+  useEffect(() => {
+    if (!session) {
+      loginRecorded.current = false
+      return
+    }
+    if (!supabase || loginRecorded.current) return
+    loginRecorded.current = true
+    void supabase.rpc('record_shield_login').then(() => undefined, () => undefined)
+  }, [session])
+
   async function handleScan(event: FormEvent) {
     event.preventDefault()
     const clean = sanitizeAccount(account)
@@ -189,6 +221,11 @@ export function App() {
         { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), at: new Date().toISOString(), result: res },
         ...h,
       ].slice(0, 12))
+      if (supabase && session) {
+        void supabase
+          .rpc('record_shield_search', { p_account_number: clean, p_bank_name: bank, p_verdict: res.verdict })
+          .then(() => undefined, () => undefined)
+      }
     } finally {
       setScanning(false)
     }
@@ -222,7 +259,7 @@ export function App() {
         evidenceUrl = reportUrl.trim() || null
       } else if (reportFile) {
         const ext = reportFile.name.split('.').pop() ?? (reportEvidenceType === 'pdf' ? 'pdf' : 'png')
-        const fileName = `${Date.now()}_${cleanAccount}.${ext}`
+        const fileName = evidenceFileName(cleanAccount, ext)
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('evidence')
           .upload(fileName, reportFile, { cacheControl: '3600', upsert: false })
@@ -292,10 +329,23 @@ export function App() {
             <span className="brand-badge">{ICONS.shield}</span>
             <span>
               Shield
-              <small>by AG Tech — the Truecaller for bank apps</small>
+              <small>by AG Tech — The Truecaller for bank apps</small>
             </span>
           </div>
           <div className="top-actions">
+            <button type="button" className="icon-btn" onClick={handlePrint} aria-label="Print report">
+              {ICONS.printer}
+              Print
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              {theme === 'light' ? ICONS.moon : ICONS.sun}
+              {theme === 'light' ? 'Dark' : 'Light'}
+            </button>
             {session ? (
               <button type="button" className="icon-btn" onClick={() => void handleSignOut()} aria-label="Sign out">
                 {ICONS.user}
@@ -307,19 +357,6 @@ export function App() {
                 Sign in
               </button>
             )}
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            >
-              {theme === 'light' ? ICONS.moon : ICONS.sun}
-              {theme === 'light' ? 'Dark' : 'Light'}
-            </button>
-            <button type="button" className="icon-btn" onClick={handlePrint} aria-label="Print report">
-              {ICONS.printer}
-              Print
-            </button>
           </div>
         </div>
       </header>
@@ -332,10 +369,17 @@ export function App() {
           <button type="button" className={`tab ${tab === 'events' ? 'sel' : ''}`} onClick={() => setTab('events')}>
             {ICONS.calendar} TechVerse 2027
           </button>
+          {isAdmin && (
+            <button type="button" className={`tab ${tab === 'admin' ? 'sel' : ''}`} onClick={() => setTab('admin')}>
+              {ICONS.chart} Admin
+            </button>
+          )}
         </nav>
 
         {tab === 'events' ? (
           <EventPanel />
+        ) : tab === 'admin' && isAdmin ? (
+        <AdminPanel />
         ) : (
         <>
         <section className="hero">
@@ -435,6 +479,7 @@ export function App() {
         </>
         )}
 
+        {tab !== 'admin' && (
         <section id="reports" className="section-marker">
           <h2 style={{ margin: '34px 0 0' }}>Report a Scam</h2>
           <p style={{ color: 'var(--muted)', marginTop: 6 }}>
@@ -641,10 +686,11 @@ export function App() {
             </div>
           </div>
         </section>
+        )}
       </main>
 
       <footer className="footer">
-        Shield by AG Tech · the Truecaller for bank apps · built on the AG SHIELD risk engine
+        Shield by AG Tech · The Truecaller for bank apps · built on the AG SHIELD risk engine
       </footer>
 
       {showModal && (
@@ -713,7 +759,7 @@ export function App() {
             </tbody>
           </table>
         )}
-        <p className="print-foot">Generated by Shield by AG Tech · the Truecaller for bank apps</p>
+        <p className="print-foot">Generated by Shield by AG Tech · The Truecaller for bank apps</p>
       </section>
     </>
   )

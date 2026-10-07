@@ -6,6 +6,7 @@ import { sandboxCacLookup, demoVerifyMerchant, type CACMatch, type MerchantResul
 import { getMockAccount } from '../lib/mockData'
 import { ACCOUNT_NUMBER_LENGTH, BANKS, BANK_CODES } from '../lib/constants'
 import { Award, Building2, CheckCircle, Loader2, Shield, AlertCircle, X, Search, Clock } from 'lucide-react'
+import ThemeToggle from '../components/ThemeToggle'
 
 function companyTypeFrom(cacNumber: string): string {
   const match = cacNumber.match(/^([A-Za-z]+)/)
@@ -169,6 +170,7 @@ export default function VerifyBusinessPage() {
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">by AG Tech</span>
         </div>
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           <button type="button" onClick={() => navigate('/dashboard')} className="text-sm text-gray-600 hover:text-green-600">Dashboard</button>
           <button type="button" onClick={() => navigate('/login')} className="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Sign In</button>
         </div>
@@ -248,7 +250,7 @@ export default function VerifyBusinessPage() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="e.g. Deolu Ventures"
-                      className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
                     />
                     <button
                       type="submit"
@@ -288,7 +290,7 @@ export default function VerifyBusinessPage() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your registered business name"
                     required
-                    className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
                   />
                 </div>
                 <div>
@@ -299,7 +301,7 @@ export default function VerifyBusinessPage() {
                     onChange={(e) => setCac(e.target.value.toUpperCase())}
                     placeholder="RC1234567"
                     required
-                    className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                    className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-mono"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -312,7 +314,7 @@ export default function VerifyBusinessPage() {
                       placeholder="10-digit account"
                       maxLength={10}
                       required
-                      className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                      className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-mono"
                     />
                   </div>
                   <div>
@@ -320,7 +322,7 @@ export default function VerifyBusinessPage() {
                     <select
                       value={bank}
                       onChange={(e) => setBank(e.target.value)}
-                      className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full mt-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
                     >
                       {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>

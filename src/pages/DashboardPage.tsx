@@ -7,7 +7,7 @@ import { clearDemoSession, isDemoMode } from '../lib/demoAuth'
 import { processRisk, type RiskInput } from '../lib/riskEngine'
 import { getMockAccount } from '../lib/mockData'
 import { ACCOUNT_NUMBER_LENGTH, BANK_CODES, BANKS, HIGH_AMOUNT_THRESHOLD, HISTORY_MAX_ITEMS, REPORT_CATEGORIES } from '../lib/constants'
-import { AlertTriangle, ArrowRight, Award, Bitcoin, Building2, Briefcase, Camera, Check, CheckCircle, CreditCard, Factory, FileText, Gift, Heart, Home, Landmark, Link2, Loader2, MessageSquare, MoreHorizontal, Search, Send, ShieldCheck, Store, Upload, User, UserX, Wallet, AlertCircle as AlertIcon, Bell, Image as ImageIcon, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Award, Bitcoin, Building2, Briefcase, Camera, Check, CheckCircle, CreditCard, Factory, FileText, Gift, Heart, Home, Landmark, Link2, Loader2, MessageSquare, MoreHorizontal, Printer, Search, Send, ShieldCheck, Store, Upload, User, UserX, Wallet, AlertCircle as AlertIcon, Bell, Image as ImageIcon, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Gauge from '../components/Gauge'
 import AdminStatsOverview from '../components/admin/AdminStatsOverview'
@@ -15,6 +15,7 @@ import UserManagement from '../components/admin/UserManagement'
 import B2BTenantsKeys from '../components/admin/B2BTenantsKeys'
 import RunnerHeartbeat from '../components/admin/RunnerHeartbeat'
 import { TOUR_STEPS, TOUR_LOCALE } from '../components/tourSteps'
+import ThemeToggle from '../components/ThemeToggle'
 
 type RiskLevel = 'safe' | 'warning' | 'high_risk'
 
@@ -48,6 +49,8 @@ type HistoryItem = {
   amount: number
   risk: RiskLevel
   timestamp: string
+  score?: number
+  reasons?: string[]
 }
 
 type Profile = {
@@ -328,6 +331,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     return checkAccount && checkAccount.replace(/\D/g, '').length === ACCOUNT_NUMBER_LENGTH ? checkAccount.replace(/\D/g, '') : ''
   })
   const [amount, setAmount] = useState('')
+  const [scanBank, setScanBank] = useState('')
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<RiskResult | null>(null)
   const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
@@ -533,9 +537,9 @@ export default function DashboardPage({ session }: { session: Session }) {
     setCheckError('')
     setResult(null)
     try {
-      let account = await findAccount(accountNumber)
+      let account = await findAccount(accountNumber, scanBank || undefined)
 
-      const matchedBank = account?.bank_name ?? ''
+      const matchedBank = account?.bank_name ?? scanBank
       const mockAccount = import.meta.env.DEV && !account ? getMockAccount(accountNumber, matchedBank) : null
       if (mockAccount) {
         account = {
@@ -550,7 +554,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         }
       }
 
-      const resolvedBank = account?.bank_name ?? ''
+      const resolvedBank = account?.bank_name ?? scanBank
       const totalReports = account?.total_reports ?? 0
       let fetchedName = ''
       let nameResolved = false
@@ -636,7 +640,9 @@ export default function DashboardPage({ session }: { session: Session }) {
         bankName: resolvedBank,
         amount: Number(amount) || 0,
         risk: outcome.risk,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        score: outcome.score,
+        reasons: outcome.reasons
       }
       setHistory((prev) => [newItem, ...prev].slice(0, HISTORY_MAX_ITEMS))
 
@@ -902,7 +908,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     value={nicknameInput}
                     onChange={(e) => setNicknameInput(e.target.value)}
                     placeholder="Your nickname"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
               </div>
@@ -1124,49 +1130,49 @@ export default function DashboardPage({ session }: { session: Session }) {
         <div className="flex gap-6 text-sm font-medium">
           <button
             type="button"
-            className={`${activeTab === 'home' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'home' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('home')}
           >
             Home
           </button>
           <button
             type="button"
-            className={`${activeTab === 'scan' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'scan' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('scan')}
           >
             Scan
           </button>
           <button
             type="button"
-            className={`${activeTab === 'reports' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'reports' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('reports')}
           >
             Reports
           </button>
           <button
             type="button"
-            className={`${activeTab === 'community' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'community' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('community')}
           >
             Community
           </button>
           <button
             type="button"
-            className={`${activeTab === 'merchant' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'merchant' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('merchant')}
           >
             Verify Business
           </button>
           <button
             type="button"
-            className={`${activeTab === 'events' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'events' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('events')}
           >
             Events
           </button>
           <button
             type="button"
-            className={`${activeTab === 'settings' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+            className={`${activeTab === 'settings' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
             onClick={() => setActiveTab('settings')}
           >
             Settings
@@ -1174,7 +1180,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           {isAdminViewer && (
             <button
               type="button"
-              className={`${activeTab === 'admin' ? 'text-green-600 border-b-2 border-green-600 pb-1' : 'text-gray-600 hover:text-green-600'}`}
+              className={`${activeTab === 'admin' ? 'text-brand-teal border-b-2 border-brand-teal pb-1' : 'text-gray-600 hover:text-brand-teal'}`}
               onClick={() => setActiveTab('admin')}
             >
               Admin
@@ -1190,6 +1196,7 @@ export default function DashboardPage({ session }: { session: Session }) {
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
+          <ThemeToggle />
           <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-medium">
             {getInitial(profile?.nickname ?? 'U')}
           </div>
@@ -1274,9 +1281,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <button
                       onClick={exportHistoryPDF}
                       className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Export PDF
-                    </button>
+                    > Print Report </button>
                   )}
                   {history.length > 0 && <span className="text-xs text-gray-400">{history.length} total checks</span>}
                 </div>
@@ -1578,41 +1583,85 @@ export default function DashboardPage({ session }: { session: Session }) {
         )}
 
         {activeTab === 'scan' && (
-          <div className="bg-white p-6 rounded-2xl shadow max-w-3xl mx-auto">
-            <h2 className="text-lg font-semibold mb-4">Check Account Risk</h2>
-            <form onSubmit={handleCheck} className="space-y-4">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(sanitizeAccountNumber(e.target.value))}
-                  placeholder="Enter account number"
-                  maxLength={10}
-                  className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  data-tour="scan-input"
-                />
-                <button
-                  type="submit"
-                  className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                  disabled={checking || accountNumber.length !== ACCOUNT_NUMBER_LENGTH}
-                  data-tour="check-btn"
-                >
-                  {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  {checking ? 'Checking...' : 'Check'}
-                </button>
+          <div className="glass rounded-xl p-6 shadow-sm max-w-3xl mx-auto">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">Instant Scanner</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Enter any Nigerian bank account number to see its risk tier, community flags, and masked account
+                  name before you transfer.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={exportHistoryPDF}
+                className="no-print shrink-0 text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Print Report
+              </button>
+            </div>
+            <form onSubmit={handleCheck} className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-3">
+                <div>
+                  <label htmlFor="scanAccount" className="block text-xs font-medium text-gray-500 mb-1.5">
+                    Account Number
+                  </label>
+                  <input
+                    id="scanAccount"
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(sanitizeAccountNumber(e.target.value))}
+                    placeholder="002 123 4567"
+                    maxLength={ACCOUNT_NUMBER_LENGTH}
+                    inputMode="numeric"
+                    className="w-full border rounded-lg px-4 py-2.5 font-mono tracking-[3px] focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    data-tour="scan-input"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="scanBank" className="block text-xs font-medium text-gray-500 mb-1.5">
+                    Bank
+                  </label>
+                  <select
+                    id="scanBank"
+                    value={scanBank}
+                    onChange={(e) => setScanBank(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">Auto-detect</option>
+                    {BANKS.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto bg-brand-teal text-brand-deep px-6 py-2.5 rounded-lg font-semibold hover:bg-teal-600 disabled:opacity-50 flex items-center justify-center gap-2 teal-glow"
+                    disabled={checking || accountNumber.length !== ACCOUNT_NUMBER_LENGTH}
+                    data-tour="check-btn"
+                  >
+                    {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    {checking ? 'Checking…' : 'Scan'}
+                  </button>
+                </div>
               </div>
               <div>
+                <label htmlFor="scanAmount" className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Transfer amount (optional)
+                </label>
                 <input
+                  id="scanAmount"
                   type="text"
+                  inputMode="numeric"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Transfer amount (optional)"
-                  className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g. 150000"
+                  className="w-full border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
               {checkError && <p className="text-red-500 text-sm flex items-center gap-2"><AlertIcon className="w-4 h-4" />{checkError}</p>}
             </form>
-            <p className="text-sm text-gray-500 mt-3">Assess if an account is safe or risky before you transfer.</p>
 
             {tourDemo && (
               <div data-tour="result-card" className="mt-6 pt-6 border-t">
@@ -1666,6 +1715,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
             {result && (() => {
         const tips = getSafetyTips(result, accountNumber, result.bankName || '', parseInt(amount) || 0)
+              const scoreTone = result.risk === 'safe' ? 'bg-green-500' : result.risk === 'warning' ? 'bg-amber-500' : 'bg-red-500'
               return (
                 <div className="mt-6 pt-6 border-t">
                   <div className="flex items-center gap-2 mb-4">
@@ -1677,23 +1727,33 @@ export default function DashboardPage({ session }: { session: Session }) {
                       <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center"><AlertIcon className="w-4 h-4 text-red-600" /></div>
                     )}
                     <h3 className="text-lg font-semibold">Result</h3>
+                    <span className={statusPillClass(result.risk)}>{RISK_META[result.risk].label}</span>
                   </div>
 
-                  <div className="flex items-center justify-between bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border">
-                    <div>
-                      <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">Account</p>
-                      <h4 className="font-mono font-bold tracking-wider text-gray-800 mt-0.5">{maskAccount(accountNumber)}</h4>
-                      {result.bankName && <p className="text-xs text-gray-500 font-mono">{result.bankName}</p>}
-                      {result.accountName && <p className="text-sm text-gray-600 mt-1">{result.accountName}</p>}
-                      <p className="text-xs text-gray-400 mt-2">
-                        <span className="font-semibold text-gray-600">{getSearchCount(`${accountNumber}|${result.bankName || ''}`)}</span> people also checked this account
-                      </p>
+                  <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">Account</p>
+                        <h4 className="font-mono font-bold tracking-wider text-gray-800 mt-0.5">{maskAccount(accountNumber)}</h4>
+                        <p className="text-xs text-gray-500 font-mono">{result.bankName || scanBank || 'Bank auto-detected'}</p>
+                        {result.accountName && <p className="text-sm text-gray-600 mt-1">{result.accountName}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">Score</p>
+                        <h4 className={`text-2xl font-bold mt-0.5 ${result.risk === 'safe' ? 'text-green-600' : result.risk === 'warning' ? 'text-amber-500' : 'text-red-500'}`}>
+                          {result.score}<span className="text-sm font-medium text-gray-400">/100</span>
+                        </h4>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">Score</p>
-                      <h4 className={`text-2xl font-bold mt-0.5 ${result.risk === 'safe' ? 'text-green-600' : result.risk === 'warning' ? 'text-amber-500' : 'text-red-500'}`}>{result.score}%</h4>
-                      <span className={statusPillClass(result.risk)}>{RISK_META[result.risk].label}</span>
+                    <div className="mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${scoreTone}`}
+                        style={{ width: `${Math.max(3, Math.min(100, result.score))}%` }}
+                      />
                     </div>
+                    <p className="text-xs text-gray-400 mt-2 font-mono">
+                      <span className="font-semibold text-gray-600">{getSearchCount(`${accountNumber}|${result.bankName || ''}`)}</span> people also checked this account
+                    </p>
                   </div>
 
                   {/* Dynamic Advice */}
@@ -1738,12 +1798,61 @@ export default function DashboardPage({ session }: { session: Session }) {
                       {result.socialProof}
                     </div>
                   )}
-                  <button type="button" onClick={resetVerify} className="mt-4 text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
-                    ← Check another account
-                  </button>
+                  <div className="mt-4 flex items-center justify-between">
+                    <button type="button" onClick={resetVerify} className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
+                      ← Check another account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportHistoryPDF}
+                      className="text-sm font-semibold text-brand-teal hover:underline flex items-center gap-1.5"
+                    >
+                      <Printer className="w-4 h-4" /> Print Report
+                    </button>
+                  </div>
                 </div>
               )
             })()}
+
+            {history.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Recent scans</h3>
+                  <button
+                    type="button"
+                    onClick={exportHistoryPDF}
+                    className="no-print text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Print Report
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {history.slice(0, 5).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 rounded-lg px-2 -mx-2 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${
+                          item.risk === 'safe' ? 'bg-green-100 text-green-600' : item.risk === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-500'
+                        }`}>
+                          {item.risk === 'safe' ? '✓' : item.risk === 'warning' ? '!' : '✕'}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm font-mono tracking-wider">{maskAccount(item.accountNumber)}</p>
+                          <span className="text-xs text-gray-500">{item.bankName || 'Auto-detected bank'}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {typeof item.score === 'number' && <span className="font-mono text-xs text-gray-400">{item.score}/100</span>}
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                          item.risk === 'safe' ? 'bg-green-50 text-green-700' : item.risk === 'warning' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {item.risk === 'safe' ? 'Safe' : item.risk === 'warning' ? 'Suspicious' : 'Dangerous'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1806,7 +1915,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                             placeholder="Account number"
                             maxLength={10}
                             required
-                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 font-mono tracking-widest"
+                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono tracking-widest"
                           />
                         </div>
                         <div className="relative">
@@ -1814,7 +1923,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                           <select
                             value={reportBank}
                             onChange={(e) => setReportBank(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none bg-white"
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none bg-white"
                           >
                             {BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
                           </select>
@@ -1860,7 +1969,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                           onChange={(e) => setReportOtherCategory(e.target.value)}
                           placeholder="Tell us what kind of scam this was, in your own words..."
                           required
-                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
                         />
                       )}
                     </div>
@@ -1876,7 +1985,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                         placeholder="Describe what happened — what did they promise? How did they contact you? What happened after you paid?"
                         rows={3}
                         maxLength={400}
-                        className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                        className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y"
                       />
                       <p className="text-right text-[11px] text-gray-400 mt-1">{reportDescription.length}/400</p>
                     </div>
@@ -1908,7 +2017,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                           onChange={(e) => setReportEvidenceUrl(e.target.value)}
                           placeholder="https://example.com/screenshot.png"
                           required
-                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
                         />
                       ) : (
                         <div
@@ -2075,7 +2184,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                       value={nicknameInput}
                       onChange={(e) => setNicknameInput(e.target.value)}
                       placeholder="Your nickname"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
                 </div>
@@ -2087,7 +2196,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 text-sm"
                   />
                 </div>
-                <button type="submit" className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm" disabled={savingNickname}>
+                <button type="submit" className="bg-brand-teal text-brand-deep px-5 py-2 rounded-lg hover:bg-teal-600 disabled:opacity-50 flex items-center gap-2 text-sm font-medium" disabled={savingNickname}>
                   {savingNickname ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   {savingNickname ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -2096,18 +2205,32 @@ export default function DashboardPage({ session }: { session: Session }) {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow">
+              <h3 className="text-sm font-semibold mb-1">Appearance</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Dark-first AG Tech theme. Your choice is saved on this device.
+              </p>
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <span className="text-sm text-gray-600">Theme</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Light / Dark</span>
+                  <ThemeToggle />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow">
               <h3 className="text-sm font-semibold mb-4">Notifications</h3>
               <div className="space-y-3">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-teal-500" />
                   <span className="text-sm text-gray-600">Email me when an account I searched is later flagged</span>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-teal-500" />
                   <span className="text-sm text-gray-600">Weekly fraud alert digest</span>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                  <input type="checkbox" className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-teal-500" />
                   <span className="text-sm text-gray-600">Community report updates</span>
                 </label>
               </div>
@@ -2202,7 +2325,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     onChange={(e) => setMerchantName(e.target.value)}
                     placeholder="Your registered business name"
                     required
-                    className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
                 <div>
@@ -2213,7 +2336,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     onChange={(e) => setMerchantCAC(e.target.value.toUpperCase())}
                     placeholder="RC1234567"
                     required
-                    className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+                    className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -2226,7 +2349,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                       placeholder="10-digit account"
                       maxLength={10}
                       required
-                      className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+                      className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
                     />
                   </div>
                   <div>
@@ -2234,7 +2357,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <select
                       value={merchantBank}
                       onChange={(e) => setMerchantBank(e.target.value)}
-                      className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full mt-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
                     >
                       {BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
                     </select>
@@ -2300,7 +2423,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
         {activeTab === 'events' && (
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow">
+            <div className="glass p-6 rounded-xl shadow-sm">
               <h2 className="text-lg font-semibold mb-4">Upcoming Events & Workshops</h2>
               <p className="text-sm text-gray-600 mb-6">Join our fraud awareness sessions to learn how to protect yourself and your business from scams.</p>
               
@@ -2343,7 +2466,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                           <button
                             onClick={() => handleEventSubscribe(event.id)}
                             disabled={subscribingToEvent === event.id || !subscribeEmail.trim()}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-brand-teal text-brand-deep rounded-lg text-sm font-medium hover:bg-teal-600 disabled:opacity-50"
                           >
                             {subscribingToEvent === event.id ? '...' : 'Register'}
                           </button>
@@ -2553,7 +2676,8 @@ export default function DashboardPage({ session }: { session: Session }) {
               textAlign: 'left',
             },
             buttonPrimary: {
-              backgroundColor: '#16a34a',
+              backgroundColor: '#0aaa96',
+              color: '#080830',
               fontSize: '0.875rem',
               fontWeight: 600,
             },
@@ -2568,6 +2692,48 @@ export default function DashboardPage({ session }: { session: Session }) {
           }}
         />
       )}
+
+      <section className="print-sheet" aria-label="Search audit trail">
+        <header className="print-head">
+          <strong>Shield by AG Tech</strong>
+          <span>Search Audit Trail</span>
+        </header>
+        <p className="print-meta">
+          Account: {session.user.email ?? 'signed-in user'} · Generated{' '}
+          {new Date().toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}
+        </p>
+        {history.length === 0 ? (
+          <p className="print-empty">No scans on record.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Bank</th>
+                <th>Verdict</th>
+                <th>Score</th>
+                <th>Amount (NGN)</th>
+                <th>When</th>
+                <th>Reasons</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((item) => (
+                <tr key={item.id}>
+                  <td className="font-mono">{maskAccount(item.accountNumber)}</td>
+                  <td>{item.bankName || 'Auto-detected'}</td>
+                  <td>{RISK_META[item.risk].label}</td>
+                  <td>{typeof item.score === 'number' ? `${item.score}/100` : '—'}</td>
+                  <td>{item.amount > 0 ? item.amount.toLocaleString() : '—'}</td>
+                  <td>{new Date(item.timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                  <td>{item.reasons?.length ? item.reasons.join('; ') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="print-foot">Generated by Shield by AG Tech · The Truecaller for bank apps</p>
+      </section>
     </div>
   )
 }
