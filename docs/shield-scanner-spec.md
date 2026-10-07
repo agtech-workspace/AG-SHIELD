@@ -167,3 +167,52 @@ Display these partner badges/names at the bottom of the event panel to establish
 - Field 2: Email Address
 - Field 3: Role Select (Student / Developer, Founder / Executive, Investor, Cybersecurity Analyst)
 - Submit Action: [ Join TechVerse 2027 Waitlist ]
+
+## 4. Reports UI — Plan (ported from safeguard-web)
+
+Safeguard-web shipped the Reports tab redesign on 2026-10-07 (see
+`future_feature_plans.txt` Phase E). This is the portable blueprint for the
+Shield Scanner's own Reports / "Report a Scam" surface. It must stay
+dependency-light: plain Tailwind + lucide-react only, no new packages.
+
+**Why the old version looked bad**
+- A single bare white card with unstyled `<input>`/`<select>`/`<textarea>`, a
+  flat button, and one-colour feedback text; no hierarchy, no icons, no
+  categories, and no list of the user's own reports (the Settings
+  "View my reports" link was a dead end).
+
+**Layout** — two-column grid on desktop (`lg:grid-cols-[1fr_340px]`), stacked
+on mobile; `max-w-5xl`.
+
+**Left — "Report a Scam" hero card** (keep a `data-tour` anchor for onboarding)
+1. Header band with icon badge + title/subtitle.
+2. **Step 1 · Account**: account number + bank side-by-side, icon-prefixed,
+   monospace, auto-spaced `000 000 0000`; live preview chip under the inputs
+   (spaced account · bank · NIP code).
+3. **Step 2 · Scam category**: replace the dropdown with a selectable chip
+   grid, one lucide icon + accent colour per category (map local to the
+   `REPORT_CATEGORIES` list; "Other" reveals an inline text field). Selected
+   state = tinted chip + ring + trailing check.
+4. **Step 3 · What happened**: `maxLength={400}` textarea with a live
+   `n/400` counter.
+5. **Step 4 · Evidence**: pill segmented control (Link / Image / PDF). Link =
+   URL input; Image/PDF = dashed drag-and-drop zone (hidden file input,
+   file-name/size chip, remove button, uploading spinner).
+6. Full-width submit with icon; feedback is a green/red alert banner
+   (CheckCircle / AlertCircle), not bare text.
+7. **Success state**: replace the form body with a confirmation panel
+   (check icon, masked account, "Submit another" / "View my reports" buttons).
+
+**Right rail**
+- **Your Reports**: rows for `reports` where `reporter_id = me` (RLS SELECT
+  is world-readable for authenticated users), masked account · bank · date,
+  status badge (approved green / pending amber / rejected red), category
+  chip; empty state with a CTA; refetch after a successful submit.
+- **"How reports are used"**: 3 icon bullets (moderator review, risk-score
+  signal, warn users who search the account).
+
+**Scanner-specific notes**
+- The same `submit_user_report` RPC + `evidence` storage bucket are reused.
+- In the scanner the tab may be a link from the scan result footer instead of
+  a top-level tab; keep the identical card/rail layout regardless.
+- Verification gate: `tsc` 0, eslint 0, vitest suite green, `npm run build`.

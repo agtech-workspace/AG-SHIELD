@@ -7,7 +7,8 @@ import { clearDemoSession, isDemoMode } from '../lib/demoAuth'
 import { processRisk, type RiskInput } from '../lib/riskEngine'
 import { getMockAccount } from '../lib/mockData'
 import { ACCOUNT_NUMBER_LENGTH, BANK_CODES, BANKS, HIGH_AMOUNT_THRESHOLD, HISTORY_MAX_ITEMS, REPORT_CATEGORIES } from '../lib/constants'
-import { AlertTriangle, ArrowRight, Award, CheckCircle, Search, Loader2, User, AlertCircle as AlertIcon, Bell, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Award, Bitcoin, Building2, Briefcase, Camera, Check, CheckCircle, CreditCard, Factory, FileText, Gift, Heart, Home, Landmark, Link2, Loader2, MessageSquare, MoreHorizontal, Search, Send, ShieldCheck, Store, Upload, User, UserX, Wallet, AlertCircle as AlertIcon, Bell, Image as ImageIcon, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import Gauge from '../components/Gauge'
 import AdminStatsOverview from '../components/admin/AdminStatsOverview'
 import UserManagement from '../components/admin/UserManagement'
@@ -65,6 +66,15 @@ type ReportFeedItem = {
   status?: string | null
 }
 
+type MyReportRow = {
+  id: string
+  reason_category: string | null
+  description: string | null
+  status: string | null
+  created_at: string
+  account: Pick<AccountRecord, 'account_number' | 'bank_name'> | null
+}
+
 type ActiveTab = 'home' | 'scan' | 'reports' | 'community' | 'settings' | 'admin' | 'merchant' | 'events'
 
 const STORAGE_KEY = 'safeguard_recent_checks'
@@ -74,6 +84,34 @@ const RISK_META: Record<RiskLevel, { label: string; color: string }> = {
   safe: { label: 'Safe', color: '#22c55e' },
   warning: { label: 'Suspicious', color: '#f59e0b' },
   high_risk: { label: 'Dangerous', color: '#dc2626' },
+}
+
+const CATEGORY_META: Record<string, { icon: LucideIcon; accent: string; active: string }> = {
+  'Instagram Vendor Scam': { icon: Camera, accent: 'text-pink-500', active: 'bg-pink-50 text-pink-800 border-pink-300' },
+  'Crypto P2P Fraud': { icon: Bitcoin, accent: 'text-orange-500', active: 'bg-orange-50 text-orange-800 border-orange-300' },
+  'Facebook Marketplace': { icon: Store, accent: 'text-sky-500', active: 'bg-sky-50 text-sky-800 border-sky-300' },
+  'Job/Visa Phishing': { icon: Briefcase, accent: 'text-amber-500', active: 'bg-amber-50 text-amber-800 border-amber-300' },
+  'POS Withdrawal Error': { icon: CreditCard, accent: 'text-violet-500', active: 'bg-violet-50 text-violet-800 border-violet-300' },
+  'Fake Giveaway': { icon: Gift, accent: 'text-rose-500', active: 'bg-rose-50 text-rose-800 border-rose-300' },
+  Impersonation: { icon: UserX, accent: 'text-red-500', active: 'bg-red-50 text-red-800 border-red-300' },
+  'Social Media Report': { icon: MessageSquare, accent: 'text-blue-500', active: 'bg-blue-50 text-blue-800 border-blue-300' },
+  'Rental / Housing Scam': { icon: Home, accent: 'text-teal-500', active: 'bg-teal-50 text-teal-800 border-teal-300' },
+  'Fake Supplier / Invoice': { icon: Factory, accent: 'text-slate-500', active: 'bg-slate-50 text-slate-800 border-slate-300' },
+  'Romance Scam': { icon: Heart, accent: 'text-fuchsia-500', active: 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300' },
+  'Advance Fee Fraud': { icon: Wallet, accent: 'text-yellow-600', active: 'bg-yellow-50 text-yellow-800 border-yellow-300' },
+  'Business Email Compromise': { icon: Building2, accent: 'text-indigo-500', active: 'bg-indigo-50 text-indigo-800 border-indigo-300' },
+  Other: { icon: MoreHorizontal, accent: 'text-gray-500', active: 'bg-gray-100 text-gray-800 border-gray-300' },
+}
+
+const REPORT_STATUS_META: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700' },
+  approved: { label: 'Approved', cls: 'bg-green-50 text-green-700' },
+  rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-600' },
+}
+
+function spaceAccount(n: string): string {
+  const d = n.replace(/\D/g, '')
+  return d ? `${d.slice(0, 3)}${d[3] ? ` ${d.slice(3, 6)}` : ''}${d[6] ? ` ${d.slice(6)}` : ''}` : ''
 }
 
 type SafetyTip = { icon: string; title: string; body: string }
@@ -230,6 +268,17 @@ function incrementSearchCount(accountKey: string): number {
   }
 }
 
+async function fetchMyReports(userId: string): Promise<MyReportRow[] | null> {
+  if (!supabase) return null
+  const { data } = await supabase
+    .from('reports')
+    .select('id, reason_category, description, status, created_at, account:accounts(account_number, bank_name)')
+    .eq('reporter_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(10)
+  return (data as MyReportRow[] | null) ?? null
+}
+
 async function fetchAccountName(accountNumber: string, bankName: string): Promise<string> {
   const edgeUrl = import.meta.env.VITE_RESOLVE_EDGE_URL
   const bankCode = BANK_CODES[bankName] ?? ''
@@ -295,6 +344,10 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [reportOtherCategory, setReportOtherCategory] = useState('')
   const [reporting, setReporting] = useState(false)
   const [reportFeedback, setReportFeedback] = useState('')
+  const [reportSubmitted, setReportSubmitted] = useState(false)
+  const [submittedAccount, setSubmittedAccount] = useState('')
+  const [myReports, setMyReports] = useState<MyReportRow[]>([])
+  const [myReportsLoading, setMyReportsLoading] = useState(true)
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [liveFeed, setLiveFeed] = useState<ReportFeedItem[]>([])
   const [riskChartData, setRiskChartData] = useState<{ name: string; value: number; color: string }[]>([])
@@ -638,7 +691,11 @@ export default function DashboardPage({ session }: { session: Session }) {
         p_evidence_url: evidenceUrl,
       })
       if (error) throw new Error(error.message)
-      setReportFeedback('Report submitted. Thank you!')
+      setReportSubmitted(true)
+      setSubmittedAccount(reportAccount)
+      setReportFeedback('')
+      const rows = await fetchMyReports(session.user.id)
+      if (rows) setMyReports(rows)
       setReportAccount('')
       setReportDescription('')
       setReportEvidenceType('link')
@@ -721,6 +778,24 @@ export default function DashboardPage({ session }: { session: Session }) {
         })
     }
   }, [isAdminViewer])
+
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      if (!supabase) {
+        setMyReportsLoading(false)
+        return
+      }
+      const rows = await fetchMyReports(session.user.id)
+      if (active) {
+        if (rows) setMyReports(rows)
+        setMyReportsLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [session.user.id])
 
   async function signOut() {
     if (isDemoMode()) {
@@ -1673,92 +1748,316 @@ export default function DashboardPage({ session }: { session: Session }) {
         )}
 
         {activeTab === 'reports' && (
-          <div className="bg-white p-6 rounded-2xl shadow max-w-2xl" data-tour="reports-form">
-            <h2 className="text-lg font-semibold mb-4">Report Scam</h2>
-            <form onSubmit={handleReport} className="space-y-4">
-              <input
-                value={reportAccount}
-                onChange={(e) => setReportAccount(sanitizeAccountNumber(e.target.value))}
-                placeholder="Account number"
-                maxLength={10}
-                required
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              <select
-                value={reportBank}
-                onChange={(e) => setReportBank(e.target.value)}
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                {BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
-              </select>
-              <select
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                {REPORT_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-              {reportType === 'Other' && (
-                <input
-                  value={reportOtherCategory}
-                  onChange={(e) => setReportOtherCategory(e.target.value)}
-                  placeholder="Tell us what kind of scam this was, in your own words..."
-                  required
-                  className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              )}
-              <textarea
-                value={reportDescription}
-                onChange={(e) => setReportDescription(e.target.value)}
-                placeholder="Describe what happened — what did they promise? How did they contact you? What happened after you paid?"
-                rows={3}
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-              />
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Evidence</label>
-                <select
-                  value={reportEvidenceType}
-                  onChange={(e) => setReportEvidenceType(e.target.value as 'link' | 'image' | 'pdf')}
-                  className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 mb-2"
-                >
-                  <option value="link">Link (URL)</option>
-                  <option value="image">Image</option>
-                  <option value="pdf">PDF</option>
-                </select>
-                {reportEvidenceType === 'link' ? (
-                  <input
-                    type="url"
-                    value={reportEvidenceUrl}
-                    onChange={(e) => setReportEvidenceUrl(e.target.value)}
-                    placeholder="https://example.com/screenshot.png"
-                    required
-                    className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                ) : (
-                  <input
-                    type="file"
-                    accept={reportEvidenceType === 'image' ? 'image/*' : 'application/pdf'}
-                    onChange={(e) => setReportEvidenceFile(e.target.files?.[0] ?? null)}
-                    required
-                    className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 file:mr-3 file:py-1 file:px-3 file:border-0 file:rounded file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                  />
-                )}
-                {reportEvidenceUploading && <p className="text-xs text-blue-600 mt-1">Uploading evidence...</p>}
+          <div className="max-w-5xl mx-auto grid gap-6 lg:grid-cols-[1fr_340px] items-start">
+            <div className="bg-white rounded-2xl shadow overflow-hidden" data-tour="reports-form">
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 px-6 py-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Report a Scam</h2>
+                    <p className="text-sm text-gray-500">Flag a suspicious account to warn the community.</p>
+                  </div>
+                </div>
               </div>
-              <button
-                type="submit"
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                disabled={reporting}
-              >
-                {reporting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {reporting ? 'Submitting...' : 'Submit Report'}
-              </button>
-              {reportFeedback && (
-                <p className={`text-sm ${reportFeedback.includes('error') ? 'text-red-500' : 'text-green-600'}`}>
-                  {reportFeedback}
-                </p>
-              )}
-            </form>
+
+              <div className="p-6">
+                {reportSubmitted ? (
+                  <div className="text-center py-10">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-1">Report submitted</h3>
+                    <p className="text-sm text-gray-500 mb-1">
+                      Account <span className="font-mono tracking-wider font-medium text-gray-700">{maskAccount(submittedAccount)}</span> has been flagged.
+                    </p>
+                    <p className="text-sm text-gray-500 mb-6">Our moderators review every report before it is published. Thank you.</p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setReportSubmitted(false); setReportFeedback('') }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                      >
+                        Submit another
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('my-reports')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        className="px-4 py-2 border border-green-200 text-green-700 rounded-lg hover:bg-green-50 text-sm"
+                      >
+                        View my reports
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleReport} className="space-y-5">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center">1</span>
+                        <span className="text-sm font-medium text-gray-700">Account</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="relative">
+                          <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            value={reportAccount}
+                            onChange={(e) => setReportAccount(sanitizeAccountNumber(e.target.value))}
+                            placeholder="Account number"
+                            maxLength={10}
+                            required
+                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 font-mono tracking-widest"
+                          />
+                        </div>
+                        <div className="relative">
+                          <Landmark className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <select
+                            value={reportBank}
+                            onChange={(e) => setReportBank(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none bg-white"
+                          >
+                            {BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {reportAccount && (
+                        <div className="mt-2 inline-flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-1.5">
+                          <span className="font-mono tracking-widest text-xs text-green-800">{spaceAccount(reportAccount)}</span>
+                          <span className="text-gray-300 text-xs">·</span>
+                          <span className="text-xs text-gray-600">{reportBank}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">NIP {BANK_CODES[reportBank]}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center">2</span>
+                        <span className="text-sm font-medium text-gray-700">What kind of scam is this?</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {REPORT_CATEGORIES.map((cat) => {
+                          const meta = CATEGORY_META[cat]
+                          const Icon = meta.icon
+                          const active = reportType === cat
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => { setReportType(cat); setReportFeedback('') }}
+                              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-sm transition-colors ${active ? `${meta.active} ring-1` : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50/40'}`}
+                            >
+                              <Icon className={`h-4 w-4 shrink-0 ${active ? meta.accent : 'text-gray-400'}`} />
+                              <span className="truncate">{cat}</span>
+                              {active && <Check className="w-4 h-4 ml-auto shrink-0 text-green-600" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {reportType === 'Other' && (
+                        <input
+                          value={reportOtherCategory}
+                          onChange={(e) => setReportOtherCategory(e.target.value)}
+                          placeholder="Tell us what kind of scam this was, in your own words..."
+                          required
+                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center">3</span>
+                        <span className="text-sm font-medium text-gray-700">What happened?</span>
+                      </div>
+                      <textarea
+                        value={reportDescription}
+                        onChange={(e) => setReportDescription(e.target.value)}
+                        placeholder="Describe what happened — what did they promise? How did they contact you? What happened after you paid?"
+                        rows={3}
+                        maxLength={400}
+                        className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                      />
+                      <p className="text-right text-[11px] text-gray-400 mt-1">{reportDescription.length}/400</p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center">4</span>
+                          <span className="text-sm font-medium text-gray-700">Evidence</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {([['link', 'Link', Link2], ['image', 'Image', ImageIcon], ['pdf', 'PDF', FileText]] as const).map(([key, label, Icon]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setReportEvidenceType(key)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${reportEvidenceType === key ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" /> {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {reportEvidenceType === 'link' ? (
+                        <input
+                          type="url"
+                          value={reportEvidenceUrl}
+                          onChange={(e) => setReportEvidenceUrl(e.target.value)}
+                          placeholder="https://example.com/screenshot.png"
+                          required
+                          className="mt-2 w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      ) : (
+                        <div
+                          className="mt-2"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            const f = e.dataTransfer.files?.[0]
+                            if (f) setReportEvidenceFile(f)
+                          }}
+                        >
+                          <label className={`flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition-colors ${reportEvidenceFile ? 'border-green-300 bg-green-50/40 hover:border-green-400' : 'border-gray-300 hover:border-green-300 hover:bg-green-50/40'}`}>
+                            {reportEvidenceFile ? (
+                              <>
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm text-gray-700">{reportEvidenceFile.name}</span>
+                                <span className="text-xs text-gray-400">Click to replace or drop a new file</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-5 w-5 text-gray-400" />
+                                <span className="text-sm text-gray-600">Click to attach or drag &amp; drop</span>
+                                <span className="text-xs text-gray-400">{reportEvidenceType === 'image' ? 'JPG, PNG or WEBP' : 'PDF'}</span>
+                              </>
+                            )}
+                          </label>
+                          <input
+                            type="file"
+                            accept={reportEvidenceType === 'image' ? 'image/*' : 'application/pdf'}
+                            onChange={(e) => setReportEvidenceFile(e.target.files?.[0] ?? null)}
+                            required
+                            className="hidden"
+                          />
+                          {reportEvidenceFile && (
+                            <div className="mt-2 flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                              <span className="flex items-center gap-2 text-sm text-gray-700 min-w-0">
+                                <FileText className="h-4 w-4 text-green-600 shrink-0" />
+                                <span className="truncate font-medium">{reportEvidenceFile.name}</span>
+                                <span className="text-xs text-gray-400 shrink-0">{(reportEvidenceFile.size / 1024).toFixed(0)} KB</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setReportEvidenceFile(null)}
+                                className="text-red-500 hover:text-red-600 shrink-0"
+                                aria-label="Remove file"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {reportEvidenceUploading && (
+                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Uploading evidence...
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={reporting}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-green-700 disabled:opacity-50 shadow-sm"
+                    >
+                      {reporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      {reporting ? 'Submitting...' : 'Submit Report'}
+                    </button>
+
+                    {reportFeedback && (
+                      <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm ${reportFeedback.includes('error') ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                        {reportFeedback.includes('error')
+                          ? <AlertIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                          : <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+                        {reportFeedback}
+                      </div>
+                    )}
+                  </form>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div id="my-reports" className="bg-white p-6 rounded-2xl shadow scroll-mt-24">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-green-600" /> Your Reports
+                  </h3>
+                  {myReports.length > 0 && <span className="text-xs text-gray-400">{myReports.length}</span>}
+                </div>
+                {myReportsLoading ? (
+                  <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <Loader2 className="animate-spin h-4 w-4" /> Loading your reports...
+                  </div>
+                ) : myReports.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-3xl mb-2 opacity-30">🛡️</div>
+                    <p className="text-gray-400 text-sm">You haven't reported any scams yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => setReportSubmitted(false)}
+                      className="mt-3 text-sm text-green-600 hover:text-green-700 underline"
+                    >
+                      Report an account
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {myReports.map((report) => {
+                      const statusMeta = REPORT_STATUS_META[report.status ?? ''] ?? { label: report.status ?? 'Submitted', cls: 'bg-gray-100 text-gray-600' }
+                      return (
+                        <li key={report.id} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono tracking-wider text-sm text-gray-800">
+                              {report.account ? maskAccount(report.account.account_number) : 'Unknown account'}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {report.account?.bank_name ?? ''}{report.account?.bank_name ? ' · ' : ''}{formatDate(report.created_at)}
+                          </p>
+                          <span className="mt-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            {report.reason_category ?? 'General'}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-green-600" /> How reports are used
+                </h3>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  <li className="flex gap-2.5">
+                    <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" /> Reviewed by our moderators before publishing.
+                  </li>
+                  <li className="flex gap-2.5">
+                    <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" /> Each approved report raises the account's risk score for everyone.
+                  </li>
+                  <li className="flex gap-2.5">
+                    <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" /> Users who search a flagged account see the warning.
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
 
