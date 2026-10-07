@@ -4,6 +4,8 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase, isConfigured } from './lib/supabase'
 import { getSession, onAuthStateChange, signOut as authSignOut } from './lib/auth'
 import { LoginDialog } from './components/LoginDialog'
+import { EventPanel } from './components/EventPanel'
+import { ICONS } from './lib/icons'
 import {
   BANKS,
   sanitizeAccount,
@@ -44,26 +46,6 @@ interface MyReport {
   account: { account_number: string; bank_name: string } | null
 }
 
-const ICONS = {
-  shield: <><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" /><path d="M9 12l2 2 4-4" /></>,
-  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
-  moon: <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />,
-  printer: <><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" /><path d="M6 14h12v8H6z" /></>,
-  search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
-  check: <path d="M20 6L9 17l-5-5" />,
-  alert: <><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>,
-  x: <path d="M18 6L6 18M6 6l12 12" />,
-  upload: <><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><path d="M17 8l-5-5-5 5M12 3v12" /></>,
-  trash: <><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M10 11v6M14 11v6" /></>,
-  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-  mail: <><path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M22 6l-10 7L2 6" /></>,
-  link: <><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7" /></>,
-  image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></>,
-  file: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" /></>,
-  user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></>,
-  flag: <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22v-7" /></>,
-}
-
 function themeInit(): 'light' | 'dark' {
   try {
     const saved = localStorage.getItem('shield-theme')
@@ -71,7 +53,7 @@ function themeInit(): 'light' | 'dark' {
   } catch {
     /* ignore */
   }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'dark'
 }
 
 function loadHistory(): HistoryItem[] {
@@ -93,12 +75,8 @@ export function App() {
   const [account, setAccount] = useState('')
   const [bank, setBank] = useState<string>(BANKS[0])
 
+  const [tab, setTab] = useState<'scanner' | 'events'>('scanner')
   const [showModal, setShowModal] = useState(false)
-  const [waitlist, setWaitlist] = useState(false)
-  const [wlName, setWlName] = useState('')
-  const [wlEmail, setWlEmail] = useState('')
-  const [wlRole, setWlRole] = useState('Student / Developer')
-  const [wlDone, setWlDone] = useState(false)
 
   const [session, setSession] = useState<Session | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -135,6 +113,10 @@ export function App() {
       /* ignore */
     }
   }, [history])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [tab])
 
   useEffect(() => {
     let dismissed = false
@@ -278,18 +260,9 @@ export function App() {
     setReportBank(BANKS[0])
   }
 
-  function handleWaitlist(event: FormEvent) {
-    event.preventDefault()
-    if (!wlName.trim() || !wlEmail.trim()) return
-    try {
-      const raw = localStorage.getItem('shield-techverse-regs')
-      const regs: Array<{ name: string; email: string; role: string; at: string }> = raw ? JSON.parse(raw) : []
-      regs.push({ name: wlName.trim(), email: wlEmail.trim(), role: wlRole, at: new Date().toISOString() })
-      localStorage.setItem('shield-techverse-regs', JSON.stringify(regs))
-    } catch {
-      /* ignore */
-    }
-    setWlDone(true)
+  function openEvents() {
+    setShowModal(false)
+    setTab('events')
   }
 
   function dismissModalForever() {
@@ -352,6 +325,19 @@ export function App() {
       </header>
 
       <main className="container">
+        <nav className="tabs no-print" aria-label="Sections">
+          <button type="button" className={`tab ${tab === 'scanner' ? 'sel' : ''}`} onClick={() => setTab('scanner')}>
+            {ICONS.search} Scanner
+          </button>
+          <button type="button" className={`tab ${tab === 'events' ? 'sel' : ''}`} onClick={() => setTab('events')}>
+            {ICONS.calendar} TechVerse 2027
+          </button>
+        </nav>
+
+        {tab === 'events' ? (
+          <EventPanel />
+        ) : (
+        <>
         <section className="hero">
           <h1>Scan before you pay.</h1>
           <p>
@@ -380,7 +366,7 @@ export function App() {
                 {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-            <button type="submit" className="btn" disabled={scanning}>
+            <button type="submit" className="btn ag-teal-glow" disabled={scanning}>
               {scanning ? <span className="spinner" /> : ICONS.search}
               {scanning ? 'Scanning…' : 'Scan'}
             </button>
@@ -446,6 +432,8 @@ export function App() {
             </button>
           )}
         </section>
+        </>
+        )}
 
         <section id="reports" className="section-marker">
           <h2 style={{ margin: '34px 0 0' }}>Report a Scam</h2>
@@ -672,43 +660,14 @@ export function App() {
               <li>AI Governance &amp; Ethical Code — local data pipelines in emerging markets.</li>
               <li>Product &amp; Venture Building — for the next 100 million users.</li>
             </ul>
-            {!waitlist && (
-              <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Keynotes &amp; panels with leaders from AWS, Paystack, Interswitch, the EU Delegation, and the Ministry of Communications.</p>
-            )}
-            {waitlist ? (
-              <form onSubmit={handleWaitlist}>
-                <div className="field">
-                  <label htmlFor="wlName">Full Name</label>
-                  <input id="wlName" required value={wlName} onChange={(e) => setWlName(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="wlEmail">Email Address</label>
-                  <input id="wlEmail" type="email" required value={wlEmail} onChange={(e) => setWlEmail(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="wlRole">Role</label>
-                  <select id="wlRole" value={wlRole} onChange={(e) => setWlRole(e.target.value)}>
-                    <option>Student / Developer</option>
-                    <option>Founder / Executive</option>
-                    <option>Investor</option>
-                    <option>Cybersecurity Analyst</option>
-                  </select>
-                </div>
-                {!wlDone ? (
-                  <div className="modal-actions">
-                    <button type="submit" className="btn">{ICONS.mail} Join TechVerse 2027 Waitlist</button>
-                  </div>
-                ) : (
-                  <div className="banner ok">{ICONS.check}<span>You're on the list. We'll email you closer to the date.</span></div>
-                )}
-              </form>
-            ) : (
-              <div className="modal-actions">
-                <button type="button" className="btn" onClick={() => setWaitlist(true)}>{ICONS.check} Join Waitlist / Learn More</button>
-                <button type="button" className="ghost-link" onClick={() => setShowModal(false)}>Maybe Later</button>
-                <button type="button" className="ghost-link" onClick={dismissModalForever}>Don't show again</button>
-              </div>
-            )}
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+              Featuring leaders from cloud, AI, fintech, and public-sector institutions — announced soon.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn ag-teal-glow" onClick={openEvents}>{ICONS.check} Reserve Campus Pass</button>
+              <button type="button" className="ghost-link" onClick={openEvents}>View Full Blueprint</button>
+              <button type="button" className="ghost-link" onClick={dismissModalForever}>Don't show again</button>
+            </div>
           </div>
         </div>
       )}
