@@ -53,6 +53,17 @@ export function EventPanel() {
     } catch {
       /* ignore */
     }
+    const subject = encodeURIComponent('TechVerse Connect 2027 — Waitlist Registration')
+    const body = encodeURIComponent(
+      [
+        `Full Name: ${name.trim()}`,
+        `Email Address: ${email.trim()}`,
+        `Primary Role: ${role}`,
+        '',
+        'Submitted via Shield by AG Tech · TechVerse 2027',
+      ].join('\r\n'),
+    )
+    window.location.href = `mailto:info@agtechafrica.org?subject=${subject}&body=${body}`
     setSubmitted(true)
   }
 
@@ -115,7 +126,7 @@ export function EventPanel() {
         {submitted ? (
           <div className="banner ok">
             {ICONS.check}
-            <span>You're on the list. We'll email you closer to the date.</span>
+            <span>You're on the list — your mail app opened with a prefilled email to info@agtechafrica.org.</span>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="wl-form">
@@ -134,6 +145,7 @@ export function EventPanel() {
               </select>
             </div>
             <button type="submit" className="btn btn-block ag-teal-glow">{ICONS.mail} Join TechVerse 2027 Waitlist</button>
+            <p className="event-muted" style={{ margin: 0 }}>Submitting opens your mail app addressed to info@agtechafrica.org — hit send to finish.</p>
           </form>
         )}
       </div>
