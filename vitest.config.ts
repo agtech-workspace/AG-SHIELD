@@ -7,9 +7,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    browser: {
-      enabled: false,
-      provider: 'vitest-browser-react',
-    },
+    exclude: ['**/node_modules/**', '**/dist/**', 'sdk/**', '**/sdk/**'],
+
   },
 })

@@ -1,0 +1,209 @@
+openapi: 3.0.3
+info:
+  title: AG SHIELD Partner Risk API
+  version: 0.1.0-preview
+  description: >-
+    Review-only technical contract. Personal data and risk inferences require NDPA 2023 and GAID 2025 compliance review, DPIA, lawful basis, transparency, retention and human-review safeguards; this document is not evidence of compliance or a live release.
+    Unpublished, source-aligned preview of the existing Supabase risk-check edge function.
+    This specification describes the proposed hardened gateway, not the currently
+    deployed service or a certified financial decisioning API. A failed or missing
+    evaluation is UNKNOWN, never SAFE. No additional partner endpoints are claimed.
+servers:
+  - url: https://zmiaaxnevvznmvfzlcba.functions.supabase.co
+    description: Origin referenced by the checked-in source; deployment not verified.
+security:
+  - ApiKeyAuth: []
+paths:
+  /risk-check:
+    post:
+      operationId: riskCheck
+      tags: [Risk evaluation]
+      summary: Evaluate a Nigerian bank account for transaction risk
+      description: >-
+        Server-to-server only. Keys issued by the existing admin console require
+        verify:read. Send the raw hexadecimal key as X-API-Key (the admin console
+        can display sg_live.<raw> but that prefix is not part of the raw token).
+        This proposed gateway ignores client-supplied sandbox headers. Browser
+        requests require an explicit trusted Origin via AG_SHIELD_ALLOWED_ORIGINS;
+        server-to-server callers do not need an Origin header. CORS alone is not
+        authorization. Results contain risk inferences, not findings of guilt.
+        Backend metering can happen before evaluation and repeat attempts can be billable.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskCheckRequest'
+            example:
+              account_number: '0123456789'
+              bank_name: GTBank
+              amount: 250000
+              is_new_recipient: true
+      responses:
+        '200':
+          description: >-
+            Successfully evaluated and audited under the proposed hardened gateway.
+            A risk verdict is not a guarantee that a transfer is safe. Responses
+            should not be cached and cannot replace human review of adverse actions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskCheckResponse'
+              example:
+                status: warning
+                risk_level: warning
+                risk_score: 62
+                confidence_interval: 0.8
+                recommended_action: REVIEW
+                reasons: [Community reports]
+                source_registry: [OSINT]
+                primary_match_flags: []
+                social_proof: '2 community report(s) found for this account'
+                execution_time_ms: 42
+        '400': { $ref: '#/components/responses/ApiError' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403':
+          description: Missing API key scope or browser Origin is not allowlisted under the review draft; decision UNKNOWN.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '405': { $ref: '#/components/responses/ApiError' }
+        '429':
+          description: >-
+            Per-key instance burst guard or monthly database quota reached.
+            No risk verdict is available (UNKNOWN). Retry-After may be present.
+          headers:
+            Retry-After:
+              description: Optional retry delay in seconds, when provided by gateway.
+              schema: { type: integer, minimum: 0 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '500': { $ref: '#/components/responses/ApiError' }
+        '503': { $ref: '#/components/responses/ApiError' }
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >-
+        Server-side only, with scope verify:read. Never expose API keys in a
+        browser, mobile application, code repository, or client telemetry.
+  responses:
+    ApiError:
+      description: >-
+        The request did not yield a reliable verdict. Decision UNKNOWN; never
+        infer SAFE or release a transfer based on an error response.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    RiskCheckRequest:
+      type: object
+      required: [account_number, bank_name]
+      properties:
+        account_number:
+          type: string
+          pattern: '^[0-9]{10}$'
+          description: Nigerian bank account number; retain leading zeros.
+          example: '0123456789'
+        bank_name:
+          type: string
+          minLength: 1
+          description: Nonempty bank name. Bank-code canonicalization is not validated.
+          example: GTBank
+        amount:
+          type: number
+          minimum: 0
+          description: Finite amount in Nigerian naira (NGN); defaults to zero if absent.
+          example: 250000
+        is_new_recipient:
+          type: boolean
+          default: true
+        holder_name:
+          type: string
+          maxLength: 200
+          description: >-
+            Optional unverified input hint for name screening, never independent
+            proof of the recipient's identity.
+    RiskCheckResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - status
+        - risk_level
+        - risk_score
+        - recommended_action
+        - reasons
+        - source_registry
+        - primary_match_flags
+        - execution_time_ms
+      properties:
+        status:
+          $ref: '#/components/schemas/RiskLevel'
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        risk_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        confidence_interval:
+          type: number
+          nullable: true
+          description: >-
+            Legacy misnomer: scalar confidence forwarded from SQL, NOT an interval.
+        source_registry:
+          type: array
+          items: { type: string }
+        primary_match_flags:
+          type: array
+          items: { type: string }
+        recommended_action:
+          type: string
+          enum:
+            - ALLOW
+            - REVIEW
+            - BLOCK
+            - FORCE_MANDATORY_SECONDARY_OTP
+          description: >-
+            The final value is emitted by the existing v3.2 SQL function in
+            high-risk, high-value cases. Treat as hold and additional verification,
+            never an automatic ALLOW.
+        reasons:
+          type: array
+          items: { type: string }
+        social_proof:
+          type: string
+          nullable: true
+          description: RPC-provided explanatory text, not a JSON report-count object.
+        execution_time_ms:
+          type: number
+          minimum: 0
+      description: >-
+        status and risk_level are equal in the proposed gateway. Only a valid,
+        completely shaped 2xx response constitutes an evaluation; non-2xx,
+        network failures, malformed data, or missing audit result are UNKNOWN.
+    RiskLevel:
+      type: string
+      enum: [safe, warning, high_risk]
+    ApiError:
+      type: object
+      additionalProperties: true
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Diagnostic code when present; not yet a stable public taxonomy.
+        retry_after_seconds:
+          type: integer
+          minimum: 0
+        calls_used:
+          type: integer
+          nullable: true
+        monthly_quota:
+          type: integer
+          nullable: true
